@@ -4,7 +4,6 @@ const supabaseUrl = "https://xqkvnkijbdruduarbalq.supabase.co";
 const supabaseAnonKey = "sb_publishable_LoY6j9WujEEuZwOXoaXufA_Q280_CwQ";
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-);
 
 let currentUser = null;
 
@@ -17,11 +16,14 @@ async function loadBalance() {
     .eq("id", currentUser.id)
     .single();
 
-  if (!error) {
-    document.getElementById("tcBalance").textContent =
-      data.tc_balance.toFixed(2) + " TC";
+  if (!error && data) {
+    const balance = typeof data.tc_balance === "number" ? data.tc_balance : 0;
+    const el = document.getElementById("tcBalance");
+    if (el) {
+      el.textContent = balance.toFixed(2) + " TC";
+      el.style.display = "inline-block";
+    }
   }
-}
 }
 
 supabase.auth.onAuthStateChange((_event, session) => {
@@ -29,131 +31,137 @@ supabase.auth.onAuthStateChange((_event, session) => {
   updateAuthUI();
 });
 
-checkAuth();
-
-const themeToggleBtn = document.getElementById('theme-toggle');
-const themeToggleDarkIcon = document.getElementById('theme-toggle-dark-icon');
-const themeToggleLightIcon = document.getElementById('theme-toggle-light-icon');
+// ---------------- Theme & UI ----------------
+const themeToggleBtn = document.getElementById("theme-toggle");
+const themeToggleDarkIcon = document.getElementById("theme-toggle-dark-icon");
+const themeToggleLightIcon = document.getElementById("theme-toggle-light-icon");
 let chartInstance = null;
 
 if (
-  localStorage.getItem('color-theme') === 'dark' ||
-  (!('color-theme' in localStorage) &&
-    window.matchMedia('(prefers-color-scheme: dark)').matches)
+  localStorage.getItem("color-theme") === "dark" ||
+  (!("color-theme" in localStorage) &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches)
 ) {
-  document.documentElement.classList.add('dark');
-  themeToggleLightIcon.classList.remove('hidden');
+  document.documentElement.classList.add("dark");
+  if (themeToggleLightIcon) themeToggleLightIcon.classList.remove("hidden");
 } else {
-  document.documentElement.classList.remove('dark');
-  themeToggleDarkIcon.classList.remove('hidden');
+  document.documentElement.classList.remove("dark");
+  if (themeToggleDarkIcon) themeToggleDarkIcon.classList.remove("hidden");
 }
 
-themeToggleBtn.addEventListener('click', function () {
-  themeToggleDarkIcon.classList.toggle('hidden');
-  themeToggleLightIcon.classList.toggle('hidden');
-  document.documentElement.classList.toggle('dark');
-  const currentTheme = document.documentElement.classList.contains('dark')
-    ? 'dark'
-    : 'light';
-  localStorage.setItem('color-theme', currentTheme);
-  if (chartInstance) {
-    const symbol =
-      document.getElementById('stock-search').value.toUpperCase() || 'AAPL';
-    renderChart(generateStockData(100), currentTheme, symbol);
-  }
-});
+if (themeToggleBtn) {
+  themeToggleBtn.addEventListener("click", function () {
+    if (themeToggleDarkIcon) themeToggleDarkIcon.classList.toggle("hidden");
+    if (themeToggleLightIcon) themeToggleLightIcon.classList.toggle("hidden");
+    document.documentElement.classList.toggle("dark");
+    const currentTheme = document.documentElement.classList.contains("dark")
+      ? "dark"
+      : "light";
+    localStorage.setItem("color-theme", currentTheme);
+    if (chartInstance) {
+      const symbol =
+        document.getElementById("stock-search").value.toUpperCase() || "AAPL";
+      renderChart(generateStockData(100), currentTheme, symbol);
+    }
+  });
+}
 
-document.getElementById("tcBalance").style.display =
-  currentUser ? "inline-block" : "none";
+const tcBalanceEl = document.getElementById("tcBalance");
+if (tcBalanceEl) {
+  tcBalanceEl.style.display = currentUser ? "inline-block" : "none";
+}
 
-const mobileMenuButton = document.getElementById('mobile-menu-button');
-const mobileMenu = document.getElementById('mobile-menu');
-mobileMenuButton.addEventListener('click', () => {
-  mobileMenu.classList.toggle('hidden');
-  const isExpanded =
-    mobileMenuButton.getAttribute('aria-expanded') === 'true' || false;
-  mobileMenuButton.setAttribute('aria-expanded', !isExpanded);
-  mobileMenuButton
-    .querySelectorAll('svg')
-    .forEach((icon) => icon.classList.toggle('hidden'));
-});
+const mobileMenuButton = document.getElementById("mobile-menu-button");
+const mobileMenu = document.getElementById("mobile-menu");
+if (mobileMenuButton && mobileMenu) {
+  mobileMenuButton.addEventListener("click", () => {
+    mobileMenu.classList.toggle("hidden");
+    const isExpanded =
+      mobileMenuButton.getAttribute("aria-expanded") === "true" || false;
+    mobileMenuButton.setAttribute("aria-expanded", !isExpanded);
+    mobileMenuButton
+      .querySelectorAll("svg")
+      .forEach((icon) => icon.classList.toggle("hidden"));
+  });
+}
 
-const loginModal = document.getElementById('loginModal');
-const registerModal = document.getElementById('registerModal');
-const priceAlertModal = document.getElementById('priceAlertModal');
+// Modals & modal helpers
+const loginModal = document.getElementById("loginModal");
+const registerModal = document.getElementById("registerModal");
+const priceAlertModal = document.getElementById("priceAlertModal");
 
-const loginBtnNav = document.getElementById('loginBtnNav');
-const loginBtnMobile = document.getElementById('loginBtnMobile');
-const closeLoginModalBtn = document.getElementById('closeLoginModal');
-const switchToRegisterBtn = document.getElementById('switchToRegister');
+const loginBtnNav = document.getElementById("loginBtnNav");
+const loginBtnMobile = document.getElementById("loginBtnMobile");
+const closeLoginModalBtn = document.getElementById("closeLoginModal");
+const switchToRegisterBtn = document.getElementById("switchToRegister");
 
-const closeRegisterModalBtn = document.getElementById('closeRegisterModal');
-const switchToLoginBtn = document.getElementById('switchToLogin');
+const closeRegisterModalBtn = document.getElementById("closeRegisterModal");
+const switchToLoginBtn = document.getElementById("switchToLogin");
 
-const setPriceAlertBtn = document.getElementById('setPriceAlertBtn');
-const closePriceAlertModalBtn = document.getElementById('closePriceAlertModal');
+const setPriceAlertBtn = document.getElementById("setPriceAlertBtn");
+const closePriceAlertModalBtn = document.getElementById("closePriceAlertModal");
 
 function openModal(modal) {
-  modal.classList.add('active');
+  if (!modal) return;
+  modal.classList.add("active");
   setTimeout(() => {
-    modal
-      .querySelector('div[class*="bg-white"]')
-      .classList.remove('scale-95', 'opacity-0');
-    modal
-      .querySelector('div[class*="bg-white"]')
-      .classList.add('scale-100', 'opacity-100');
+    const inner = modal.querySelector('div[class*="bg-white"]');
+    if (inner) {
+      inner.classList.remove("scale-95", "opacity-0");
+      inner.classList.add("scale-100", "opacity-100");
+    }
   }, 10);
-  document.body.style.overflow = 'hidden';
+  document.body.style.overflow = "hidden";
 }
 
 function closeModal(modal) {
-  modal
-    .querySelector('div[class*="bg-white"]')
-    .classList.remove('scale-100', 'opacity-100');
-  modal
-    .querySelector('div[class*="bg-white"]')
-    .classList.add('scale-95', 'opacity-0');
+  if (!modal) return;
+  const inner = modal.querySelector('div[class*="bg-white"]');
+  if (inner) {
+    inner.classList.remove("scale-100", "opacity-100");
+    inner.classList.add("scale-95", "opacity-0");
+  }
   setTimeout(() => {
-    modal.classList.remove('active');
-    document.body.style.overflow = 'auto';
+    modal.classList.remove("active");
+    document.body.style.overflow = "auto";
   }, 300);
 }
 
-[loginBtnNav, loginBtnMobile].forEach((btn) =>
-  btn.addEventListener('click', () => openModal(loginModal))
-);
-closeLoginModalBtn.addEventListener('click', () => closeModal(loginModal));
-switchToRegisterBtn.addEventListener('click', (e) => {
-  e.preventDefault();
-  closeModal(loginModal);
-  openModal(registerModal);
-});
+if ([loginBtnNav, loginBtnMobile].every(Boolean)) {
+  [loginBtnNav, loginBtnMobile].forEach((btn) =>
+    btn.addEventListener("click", () => openModal(loginModal))
+  );
+}
+if (closeLoginModalBtn) closeLoginModalBtn.addEventListener("click", () => closeModal(loginModal));
+if (switchToRegisterBtn)
+  switchToRegisterBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    closeModal(loginModal);
+    openModal(registerModal);
+  });
 
-closeRegisterModalBtn.addEventListener('click', () =>
-  closeModal(registerModal)
-);
-switchToLoginBtn.addEventListener('click', (e) => {
-  e.preventDefault();
-  closeModal(registerModal);
-  openModal(loginModal);
-});
+if (closeRegisterModalBtn)
+  closeRegisterModalBtn.addEventListener("click", () => closeModal(registerModal));
+if (switchToLoginBtn)
+  switchToLoginBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    closeModal(registerModal);
+    openModal(loginModal);
+  });
 
-setPriceAlertBtn.addEventListener('click', () => {
-  const currentSymbol =
-    document.getElementById('stock-search').value.toUpperCase() || 'STOCK';
-  document.getElementById(
-    'alertStockSymbol'
-  ).textContent = `For ${currentSymbol}`;
-  openModal(priceAlertModal);
-});
-closePriceAlertModalBtn.addEventListener('click', () =>
-  closeModal(priceAlertModal)
-);
+if (setPriceAlertBtn) {
+  setPriceAlertBtn.addEventListener("click", () => {
+    const currentSymbol =
+      document.getElementById("stock-search").value.toUpperCase() || "STOCK";
+    const el = document.getElementById("alertStockSymbol");
+    if (el) el.textContent = `For ${currentSymbol}`;
+    openModal(priceAlertModal);
+  });
+}
+if (closePriceAlertModalBtn)
+  closePriceAlertModalBtn.addEventListener("click", () => closeModal(priceAlertModal));
 
-const MAX_PRICE = 200000;
-const MIN_PRICE = 0;
-
-// ============ MARKET HOURS CONTROL (TUSEC) ============
+// ================= Market Hours =================
 function isMarketOpen() {
   const now = new Date();
   const hour = now.getHours();
@@ -339,99 +347,102 @@ const initialStockPrices = {
   },
 };
 
+// Build dummyStockData correctly using the stock objects
 const dummyStockData = {};
-
-Object.entries(initialStockPrices).forEach(([symbol, price]) => {
+Object.entries(initialStockPrices).forEach(([symbol, stock]) => {
+  const p = typeof stock.price === "number" ? stock.price : Number(stock.price || 0);
   dummyStockData[symbol] = {
-    name: symbol,
-    price,
-    change: '+0.00',
-    changePercent: '+0.00%',
-    open: price,
-    high: price,
-    low: price,
-    dayHigh: price,
-    dayLow: price,
-    initial: price,
+    ...stock,
+    price: p,
+    open: stock.open ?? p,
+    high: stock.high ?? p,
+    low: stock.low ?? p,
+    dayHigh: stock.dayHigh ?? p,
+    dayLow: stock.dayLow ?? p,
+    initial: p,
   };
 });
 
-const tickerMove = document.querySelector('.ticker-move');
+// Ticker populate
+const tickerMove = document.querySelector(".ticker-move");
 function populateTicker() {
-  let tickerHTML = '';
+  if (!tickerMove) return;
+  let tickerHTML = "";
   const symbols = Object.keys(dummyStockData);
   for (let i = 0; i < 2; i++) {
     symbols.forEach((symbol) => {
       const stock = dummyStockData[symbol];
-      const changeClass = stock.change.startsWith('+')
-        ? 'text-green-400'
-        : 'text-red-400';
-        tickerHTML += `
+      const changeClass = stock.change && stock.change.startsWith("+")
+        ? "text-green-400"
+        : "text-red-400";
+      tickerHTML += `
         <div class="ticker-item inline-flex items-center">
             <span class="font-semibold">${symbol}</span>
-            <span class="ml-2 text-sm">${stock.price.toFixed(
-              2
-            )}</span>
-            <span class="ml-1 text-xs ${changeClass}">${
-stock.change
-} (${stock.changePercent})</span>
+            <span class="ml-2 text-sm">${stock.price.toFixed(2)}</span>
+            <span class="ml-1 text-xs ${changeClass}">${stock.change} (${stock.changePercent})</span>
         </div>
-    `;
-});
+      `;
+    });
   }
   tickerMove.innerHTML = tickerHTML;
 }
 populateTicker();
 
+// Update stock prices periodically but only during market hours
 setInterval(() => {
+  if (!isMarketOpen()) {
+    // Market closed — don't simulate intraday movement
+    return;
+  }
   Object.keys(dummyStockData).forEach((symbol) => {
     const stock = dummyStockData[symbol];
-    const randomChange = (Math.random() * 0.5 - 0.25).toFixed(2);
-    stock.price = parseFloat(
-      (stock.price + parseFloat(randomChange)).toFixed(2)
-    );
+    const randomChange = (Math.random() * 0.5 - 0.25); // -0.25 .. +0.25
+    stock.price = parseFloat((stock.price + randomChange).toFixed(2));
     if (stock.price < 0) stock.price = 0.1;
 
-    const oldChangeVal = parseFloat(stock.change);
-    const newChangeVal = (oldChangeVal + (Math.random() * 0.1 - 0.05)).toFixed(
-      2
-    );
-    const newChangePercentVal = (
-      (newChangeVal / (stock.price - newChangeVal)) *
-      100
-    ).toFixed(2);
+    const oldChangeVal = parseFloat(stock.change) || 0;
+    const newChangeVal = parseFloat((oldChangeVal + (Math.random() * 0.1 - 0.05)).toFixed(2));
+    const newChangePercentVal = parseFloat(((newChangeVal / (Math.max(0.01, stock.price - newChangeVal))) * 100).toFixed(2));
 
-    stock.change = (newChangeVal > 0 ? '+' : '') + newChangeVal;
-    stock.changePercent =
-      (newChangeVal > 0 ? '+' : '') + newChangePercentVal + '%';
+    stock.change = (newChangeVal > 0 ? "+" : "") + newChangeVal.toFixed(2);
+    stock.changePercent = (newChangeVal > 0 ? "+" : "") + newChangePercentVal.toFixed(2) + "%";
+
+    // update dayHigh/dayLow
+    stock.dayHigh = Math.max(stock.dayHigh ?? stock.price, stock.price);
+    stock.dayLow = Math.min(stock.dayLow ?? stock.price, stock.price);
   });
   populateTicker();
 }, 5000);
 
-const searchInput = document.getElementById('stock-search');
-const searchButton = document.getElementById('search-button');
-const stockDetailsDiv = document.getElementById('stock-details');
-const companyNameHeader = document.getElementById('company-name');
-const searchErrorDiv = document.getElementById('search-error');
-const addToWatchlistBtn = document.getElementById('addToWatchlistBtn');
+// ---------------- Search / Details / Chart ----------------
+const searchInput = document.getElementById("stock-search");
+const searchButton = document.getElementById("search-button");
+const stockDetailsDiv = document.getElementById("stock-details");
+const companyNameHeader = document.getElementById("company-name");
+const searchErrorDiv = document.getElementById("search-error");
+const addToWatchlistBtn = document.getElementById("addToWatchlistBtn");
 
-searchButton.addEventListener('click', performSearch);
-searchInput.addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') {
-    performSearch();
-  }
-});
+if (searchButton) searchButton.addEventListener("click", performSearch);
+if (searchInput) {
+  searchInput.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") performSearch();
+  });
+}
 
 function performSearch() {
-  const searchTerm = searchInput.value.toUpperCase().trim();
-  searchErrorDiv.classList.add('hidden');
+  const searchTerm = (searchInput?.value || "").toUpperCase().trim();
+  if (searchErrorDiv) searchErrorDiv.classList.add("hidden");
+
   if (!searchTerm) {
     displayStockDetails(null);
     if (chartInstance) {
       chartInstance.remove();
       chartInstance = null;
-      document.getElementById('chart-loader').classList.remove('hidden');
+      const loader = document.getElementById("chart-loader");
+      if (loader) loader.classList.remove("hidden");
     }
+    if (addToWatchlistBtn) addToWatchlistBtn.disabled = true;
+    if (setPriceAlertBtn) setPriceAlertBtn.disabled = true;
     return;
   }
 
@@ -439,79 +450,58 @@ function performSearch() {
   displayStockDetails(stock, searchTerm);
 
   if (stock) {
-    document.getElementById('chart-loader').classList.remove('hidden');
-    renderChart(
-      generateStockData(100),
-      localStorage.getItem('color-theme') || 'light',
-      searchTerm
-    );
-    addToWatchlistBtn.disabled = false;
-    setPriceAlertBtn.disabled = false;
-    addToWatchlistBtn.textContent = isStockInWatchlist(searchTerm)
-      ? 'Remove from Watchlist'
-      : 'Add to Watchlist';
-    addToWatchlistBtn.classList.toggle(
-      'bg-red-500',
-      isStockInWatchlist(searchTerm)
-    );
-    addToWatchlistBtn.classList.toggle(
-      'hover:bg-red-600',
-      isStockInWatchlist(searchTerm)
-    );
-    addToWatchlistBtn.classList.toggle(
-      'bg-green-500',
-      !isStockInWatchlist(searchTerm)
-    );
-    addToWatchlistBtn.classList.toggle(
-      'hover:bg-green-600',
-      !isStockInWatchlist(searchTerm)
-    );
+    const loader = document.getElementById("chart-loader");
+    if (loader) loader.classList.remove("hidden");
+    renderChart(generateStockData(100), localStorage.getItem("color-theme") || "light", searchTerm);
+    if (addToWatchlistBtn) {
+      addToWatchlistBtn.disabled = false;
+      const inWL = isStockInWatchlist(searchTerm);
+      addToWatchlistBtn.textContent = inWL ? "Remove from Watchlist" : "Add to Watchlist";
+      addToWatchlistBtn.classList.toggle("bg-red-500", inWL);
+      addToWatchlistBtn.classList.toggle("hover:bg-red-600", inWL);
+      addToWatchlistBtn.classList.toggle("bg-green-500", !inWL);
+      addToWatchlistBtn.classList.toggle("hover:bg-green-600", !inWL);
+    }
+    if (setPriceAlertBtn) setPriceAlertBtn.disabled = false;
   } else {
-    searchErrorDiv.classList.remove('hidden');
+    if (searchErrorDiv) searchErrorDiv.classList.remove("hidden");
     if (chartInstance) {
       chartInstance.remove();
       chartInstance = null;
-      document.getElementById('chart-loader').classList.remove('hidden');
+      const loader = document.getElementById("chart-loader");
+      if (loader) loader.classList.remove("hidden");
     }
-    addToWatchlistBtn.disabled = true;
-    setPriceAlertBtn.disabled = true;
+    if (addToWatchlistBtn) addToWatchlistBtn.disabled = true;
+    if (setPriceAlertBtn) setPriceAlertBtn.disabled = true;
   }
 }
 
-function displayStockDetails(stock, symbol = 'N/A') {
+function displayStockDetails(stock, symbol = "N/A") {
   if (stock) {
-    companyNameHeader.textContent = `${stock.name} (${symbol})`;
-    const changeClass = stock.change.startsWith('+')
-      ? 'text-green-500 dark:text-green-400'
-      : 'text-red-500 dark:text-red-400';
+    if (companyNameHeader) companyNameHeader.textContent = `${stock.name} (${symbol})`;
+    const changeClass = stock.change && stock.change.startsWith("+")
+      ? "text-green-500 dark:text-green-400"
+      : "text-red-500 dark:text-red-400";
+    if (stockDetailsDiv) {
       stockDetailsDiv.innerHTML = `
       <div class="flex justify-between items-baseline">
-          <p class="text-3xl font-bold">${stock.price.toFixed(
-            2
-          )} <span class="text-xs text-gray-500 dark:text-gray-400">USD</span></p>
-          <p class="text-lg ${changeClass}">${stock.change} (${
-stock.changePercent
-})</p>
+          <p class="text-3xl font-bold">${stock.price.toFixed(2)} <span class="text-xs text-gray-500 dark:text-gray-400">USD</span></p>
+          <p class="text-lg ${changeClass}">${stock.change} (${stock.changePercent})</p>
       </div>
       <hr class="my-2 border-gray-200 dark:border-gray-600">
       <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-          <p><strong>Open:</strong> ${stock.open.toFixed(2)}</p>
-          <p><strong>High:</strong> ${stock.high.toFixed(2)}</p>
-          <p><strong>Low:</strong> ${stock.low.toFixed(2)}</p>
-          <p><strong>Volume:</strong> ${stock.volume}</p>
-          <p><strong>Mkt Cap:</strong> ${stock.marketCap}</p>
-          <p><strong>P/E Ratio:</strong> ${stock.peRatio}</p>
-          <p><strong>52W H:</strong> ${stock.yearHigh.toFixed(
-            2
-          )}</p>
-          <p><strong>52W L:</strong> ${stock.yearLow.toFixed(
-            2
-          )}</p>
+          <p><strong>Open:</strong> ${Number(stock.open).toFixed(2)}</p>
+          <p><strong>High:</strong> ${Number(stock.high).toFixed(2)}</p>
+          <p><strong>Low:</strong> ${Number(stock.low).toFixed(2)}</p>
+          <p><strong>Day High:</strong> ${Number(stock.dayHigh).toFixed(2)}</p>
+          <p><strong>Day Low:</strong> ${Number(stock.dayLow).toFixed(2)}</p>
       </div>
-  `;
+      `;
+    }
   } else {
-    companyNameHeader.textContent = 'Company Overview';
-    stockDetailsDiv.innerHTML = `<p class="text-sm text-gray-600 dark:text-gray-400">Search for a stock to see details.</p>`;
+    if (companyNameHeader) companyNameHeader.textContent = "Company Overview";
+    if (stockDetailsDiv)
+      stockDetailsDiv.innerHTML = `<p class="text-sm text-gray-600 dark:text-gray-400">Search for a stock to see details.</p>`;
   }
 }
 
@@ -530,7 +520,7 @@ function generateStockData(count) {
     lastClose = close;
 
     data.push({
-      time: time.toISOString().split('T')[0],
+      time: time.toISOString().split("T")[0],
       open: parseFloat(open.toFixed(2)),
       high: parseFloat(high.toFixed(2)),
       low: parseFloat(low.toFixed(2)),
@@ -541,8 +531,10 @@ function generateStockData(count) {
 }
 
 function renderChart(data, theme, symbol) {
-  const chartContainer = document.getElementById('chart-container');
-  const chartLoader = document.getElementById('chart-loader');
+  const chartContainer = document.getElementById("chart-container");
+  const chartLoader = document.getElementById("chart-loader");
+
+  if (!chartContainer) return;
 
   if (chartInstance) {
     chartInstance.remove();
@@ -552,70 +544,60 @@ function renderChart(data, theme, symbol) {
     width: chartContainer.clientWidth,
     height: chartContainer.clientHeight,
     layout: {
-      backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff',
-      textColor: theme === 'dark' ? '#d1d5db' : '#111827',
+      backgroundColor: theme === "dark" ? "#1f2937" : "#ffffff",
+      textColor: theme === "dark" ? "#d1d5db" : "#111827",
     },
     grid: {
-      vertLines: { color: theme === 'dark' ? '#374151' : '#e5e7eb' },
-      horzLines: { color: theme === 'dark' ? '#374151' : '#e5e7eb' },
+      vertLines: { color: theme === "dark" ? "#374151" : "#e5e7eb" },
+      horzLines: { color: theme === "dark" ? "#374151" : "#e5e7eb" },
     },
     crosshair: {
       mode: LightweightCharts.CrosshairMode.Normal,
     },
     priceScale: {
-      borderColor: theme === 'dark' ? '#4b5563' : '#cccccc',
+      borderColor: theme === "dark" ? "#4b5563" : "#cccccc",
     },
     timeScale: {
-      borderColor: theme === 'dark' ? '#4b5563' : '#cccccc',
+      borderColor: theme === "dark" ? "#4b5563" : "#cccccc",
       timeVisible: true,
       secondsVisible: false,
     },
     watermark: {
-      color:
-        theme === 'dark' ? 'rgba(209, 213, 219, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+      color: theme === "dark" ? "rgba(209, 213, 219, 0.1)" : "rgba(0, 0, 0, 0.1)",
       visible: true,
       text: symbol,
       fontSize: 48,
-      horzAlign: 'center',
-      vertAlign: 'center',
+      horzAlign: "center",
+      vertAlign: "center",
     },
   });
 
   const candleSeries = chartInstance.addCandlestickSeries({
-    upColor: theme === 'dark' ? '#10b981' : '#22c55e',
-    downColor: theme === 'dark' ? '#ef4444' : '#dc2626',
-    borderDownColor: theme === 'dark' ? '#ef4444' : '#dc2626',
-    borderUpColor: theme === 'dark' ? '#10b981' : '#22c55e',
-    wickDownColor: theme === 'dark' ? '#ef4444' : '#dc2626',
-    wickUpColor: theme === 'dark' ? '#10b981' : '#22c55e',
+    upColor: theme === "dark" ? "#10b981" : "#22c55e",
+    downColor: theme === "dark" ? "#ef4444" : "#dc2626",
+    borderDownColor: theme === "dark" ? "#ef4444" : "#dc2626",
+    borderUpColor: theme === "dark" ? "#10b981" : "#22c55e",
+    wickDownColor: theme === "dark" ? "#ef4444" : "#dc2626",
+    wickUpColor: theme === "dark" ? "#10b981" : "#22c55e",
   });
 
   candleSeries.setData(data);
   chartInstance.timeScale().fitContent();
-  chartLoader.classList.add('hidden');
+  if (chartLoader) chartLoader.classList.add("hidden");
 
-  window.addEventListener('resize', () => {
-    if (
-      chartInstance &&
-      chartContainer.clientWidth > 0 &&
-      chartContainer.clientHeight > 0
-    ) {
-      chartInstance.resize(
-        chartContainer.clientWidth,
-        chartContainer.clientHeight
-      );
+  window.addEventListener("resize", () => {
+    if (chartInstance && chartContainer.clientWidth > 0 && chartContainer.clientHeight > 0) {
+      chartInstance.resize(chartContainer.clientWidth, chartContainer.clientHeight);
     }
   });
 }
 
-renderChart(
-  generateStockData(100),
-  localStorage.getItem('color-theme') || 'light',
-  'AAPL'
-);
+// initial render
+renderChart(generateStockData(100), localStorage.getItem("color-theme") || "light", "AAPL");
 
-const topGainersList = document.getElementById('top-gainers-list');
-const topLosersList = document.getElementById('top-losers-list');
+// ---------------- Market Movers ----------------
+const topGainersList = document.getElementById("top-gainers-list");
+const topLosersList = document.getElementById("top-losers-list");
 
 function populateMarketMovers() {
   const stocksArray = Object.entries(dummyStockData).map(([symbol, data]) => ({
@@ -625,111 +607,89 @@ function populateMarketMovers() {
 
   stocksArray.forEach((stock) => {
     stock.numericChangePercent = parseFloat(
-      stock.changePercent.replace('+', '').replace('%', '')
+      String(stock.changePercent || "0").replace("+", "").replace("%", "")
     );
   });
 
   stocksArray.sort((a, b) => b.numericChangePercent - a.numericChangePercent);
 
-  const gainers = stocksArray
-    .filter((s) => s.numericChangePercent > 0)
-    .slice(0, 5);
+  const gainers = stocksArray.filter((s) => s.numericChangePercent > 0).slice(0, 5);
   const losers = stocksArray
     .filter((s) => s.numericChangePercent < 0)
     .sort((a, b) => a.numericChangePercent - b.numericChangePercent)
     .slice(0, 5);
 
-  topGainersList.innerHTML = gainers.length
-    ? gainers
-        .map(
-          (stock) => `
-                <li class="flex justify-between items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors duration-150 cursor-pointer" onclick="searchInput.value='${
-                  stock.symbol
-                }'; performSearch(); document.getElementById('stock-search').scrollIntoView({ behavior: 'smooth' });">
+  if (topGainersList) {
+    topGainersList.innerHTML = gainers.length
+      ? gainers
+          .map(
+            (stock) => `
+                <li class="flex justify-between items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors duration-150 cursor-pointer" onclick="searchInput.value='${stock.symbol}'; performSearch(); document.getElementById('stock-search').scrollIntoView({ behavior: 'smooth' });">
                 <div>
-                <span class="font-semibold text-gray-800 dark:text-gray-200">${
-                          stock.symbol
-                        }</span>
-                        <span class="text-xs text-gray-500 dark:text-gray-400 block">${stock.name.substring(
-                          0,
-                          20
-                        )}${stock.name.length > 20 ? '...' : ''}</span>
-                        </div>
-                        <div class="text-right">
-                        <span class="font-medium text-gray-800 dark:text-gray-200">${stock.price.toFixed(
-                          2
-                        )}</span>
-                        <span class="block text-sm text-green-500 dark:text-green-400">${
-                          stock.changePercent
-                        }</span>
-                        </div>
+                <span class="font-semibold text-gray-800 dark:text-gray-200">${stock.symbol}</span>
+                <span class="text-xs text-gray-500 dark:text-gray-400 block">${stock.name.substring(0, 20)}${stock.name.length > 20 ? "..." : ""}</span>
+                </div>
+                <div class="text-right">
+                <span class="font-medium text-gray-800 dark:text-gray-200">${Number(stock.price).toFixed(2)}</span>
+                <span class="block text-sm text-green-500 dark:text-green-400">${stock.changePercent}</span>
+                </div>
                 </li>
             `
-        )
-        .join('')
-    : '<li class="text-sm text-gray-500 dark:text-gray-400">No significant gainers today.</li>';
+          )
+          .join("")
+      : '<li class="text-sm text-gray-500 dark:text-gray-400">No significant gainers today.</li>';
+  }
 
-  topLosersList.innerHTML = losers.length
-    ? losers
-        .map(
-          (stock) => `
-          <li class="flex justify-between items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors duration-150 cursor-pointer" onclick="searchInput.value='${
-            stock.symbol
-          }'; performSearch(); document.getElementById('stock-search').scrollIntoView({ behavior: 'smooth' });">
-              <div>
-                  <span class="font-semibold text-gray-800 dark:text-gray-200">${
-                    stock.symbol
-                  }</span>
-                  <span class="text-xs text-gray-500 dark:text-gray-400 block">${stock.name.substring(
-                          0,
-                          20
-                        )}${stock.name.length > 20 ? '...' : ''}</span>
-                        </div>
-                        <div class="text-right">
-                            <span class="font-medium text-gray-800 dark:text-gray-200">${stock.price.toFixed(
-                              2
-                            )}</span>
-                            <span class="block text-sm text-red-500 dark:text-red-400">${
-                              stock.changePercent
-                            }</span>
-                        </div>
-                    </li>
+  if (topLosersList) {
+    topLosersList.innerHTML = losers.length
+      ? losers
+          .map(
+            (stock) => `
+            <li class="flex justify-between items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors duration-150 cursor-pointer" onclick="searchInput.value='${stock.symbol}'; performSearch(); document.getElementById('stock-search').scrollIntoView({ behavior: 'smooth' });">
+                <div>
+                    <span class="font-semibold text-gray-800 dark:text-gray-200">${stock.symbol}</span>
+                    <span class="text-xs text-gray-500 dark:text-gray-400 block">${stock.name.substring(0, 20)}${stock.name.length > 20 ? "..." : ""}</span>
+                </div>
+                <div class="text-right">
+                    <span class="font-medium text-gray-800 dark:text-gray-200">${Number(stock.price).toFixed(2)}</span>
+                    <span class="block text-sm text-red-500 dark:text-red-400">${stock.changePercent}</span>
+                </div>
+            </li>
             `
-        )
-        .join('')
-    : '<li class="text-sm text-gray-500 dark:text-gray-400">No significant losers today.</li>';
+          )
+          .join("")
+      : '<li class="text-sm text-gray-500 dark:text-gray-400">No significant losers today.</li>';
+  }
 }
 populateMarketMovers();
 setInterval(populateMarketMovers, 15000);
 
-const watchlistItemsDiv = document.getElementById('watchlist-items');
-const emptyWatchlistMessage = document.getElementById(
-  'empty-watchlist-message'
-);
-let watchlist = JSON.parse(localStorage.getItem('stockWatchlist')) || [];
+// ---------------- Watchlist & Portfolio ----------------
+const watchlistItemsDiv = document.getElementById("watchlist-items");
+const emptyWatchlistMessage = document.getElementById("empty-watchlist-message");
+let watchlist = JSON.parse(localStorage.getItem("stockWatchlist") || "[]");
 
 function renderWatchlist() {
+  if (!watchlistItemsDiv) return;
   if (watchlist.length === 0) {
-    watchlistItemsDiv.innerHTML = '';
-    emptyWatchlistMessage.classList.remove('hidden');
+    watchlistItemsDiv.innerHTML = "";
+    if (emptyWatchlistMessage) emptyWatchlistMessage.classList.remove("hidden");
     return;
   }
-  emptyWatchlistMessage.classList.add('hidden');
+  if (emptyWatchlistMessage) emptyWatchlistMessage.classList.add("hidden");
   watchlistItemsDiv.innerHTML = watchlist
     .map((symbol) => {
       const stock = dummyStockData[symbol];
-      if (!stock) return '';
-      const changeClass = stock.change.startsWith('+')
-        ? 'text-green-500 dark:text-green-400'
-        : 'text-red-500 dark:text-red-400';
+      if (!stock) return "";
+      const changeClass = stock.change && stock.change.startsWith("+")
+        ? "text-green-500 dark:text-green-400"
+        : "text-red-500 dark:text-red-400";
       return `
       <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg shadow hover:shadow-md transition-all duration-200 cursor-pointer" onclick="searchInput.value='${symbol}'; performSearch(); document.getElementById('stock-search').scrollIntoView({ behavior: 'smooth' });">
       <div class="flex justify-between items-start mb-2">
           <div>
               <h4 class="text-lg font-semibold text-gray-800 dark:text-gray-100">${symbol}</h4>
-              <p class="text-xs text-gray-500 dark:text-gray-400">${
-                stock.name
-              }</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">${stock.name}</p>
           </div>
            <button class="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-xs p-1" onclick="event.stopPropagation(); toggleWatchlist('${symbol}');" title="Remove from watchlist">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -738,17 +698,13 @@ function renderWatchlist() {
           </button>
       </div>
       <div class="flex justify-between items-baseline">
-          <p class="text-2xl font-bold text-gray-900 dark:text-white">${stock.price.toFixed(
-            2
-          )}</p>
-          <p class="text-md ${changeClass}">${
-stock.changePercent
-}</p>
+          <p class="text-2xl font-bold text-gray-900 dark:text-white">${Number(stock.price).toFixed(2)}</p>
+          <p class="text-md ${changeClass}">${stock.changePercent}</p>
       </div>
   </div>
-`;
-})
-.join('');
+  `;
+    })
+    .join("");
 }
 
 function isStockInWatchlist(symbol) {
@@ -759,9 +715,7 @@ function toggleWatchlist(symbol) {
   if (!symbol) return;
   const stockExists = dummyStockData[symbol];
   if (!stockExists) {
-    console.warn(
-      `Stock ${symbol} not found in dummy data. Cannot add to watchlist.`
-    );
+    console.warn(`Stock ${symbol} not found in dummy data. Cannot add to watchlist.`);
     return;
   }
 
@@ -771,21 +725,47 @@ function toggleWatchlist(symbol) {
   } else {
     watchlist.push(symbol);
   }
-  localStorage.setItem('stockWatchlist', JSON.stringify(watchlist));
+  localStorage.setItem("stockWatchlist", JSON.stringify(watchlist));
   renderWatchlist();
 
+  // Update search page button if applicable
+  const currentSearchSymbol = (searchInput?.value || "").toUpperCase().trim();
+  if (currentSearchSymbol === symbol && addToWatchlistBtn) {
+    const inWL = isStockInWatchlist(symbol);
+    addToWatchlistBtn.textContent = inWL ? "Remove from Watchlist" : "Add to Watchlist";
+    addToWatchlistBtn.classList.toggle("bg-red-500", inWL);
+    addToWatchlistBtn.classList.toggle("hover:bg-red-600", inWL);
+    addToWatchlistBtn.classList.toggle("bg-green-500", !inWL);
+    addToWatchlistBtn.classList.toggle("hover:bg-green-600", !inWL);
+  }
+}
+
+if (addToWatchlistBtn) {
+  addToWatchlistBtn.addEventListener("click", () => {
+    const symbol = (searchInput?.value || "").toUpperCase().trim();
+    toggleWatchlist(symbol);
+  });
+}
+
+// Load portfolio (kept separate and global)
 async function loadPortfolio() {
   if (!currentUser) return;
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("portfolios")
     .select("*")
     .eq("user_id", currentUser.id);
 
   const container = document.getElementById("watchlist-items");
+  if (!container) return;
   container.innerHTML = "";
 
-  if (!data.length) {
+  if (error) {
+    container.innerHTML = "<p>Error loading holdings</p>";
+    return;
+  }
+
+  if (!data || data.length === 0) {
     container.innerHTML = "<p>No holdings yet</p>";
     return;
   }
@@ -801,51 +781,20 @@ async function loadPortfolio() {
   });
 }
 
-  const currentSearchSymbol = searchInput.value.toUpperCase().trim();
-  if (currentSearchSymbol === symbol) {
-    addToWatchlistBtn.textContent = isStockInWatchlist(symbol)
-      ? 'Remove from Watchlist'
-      : 'Add to Watchlist';
-    addToWatchlistBtn.classList.toggle(
-      'bg-red-500',
-      isStockInWatchlist(symbol)
-    );
-    addToWatchlistBtn.classList.toggle(
-      'hover:bg-red-600',
-      isStockInWatchlist(symbol)
-    );
-    addToWatchlistBtn.classList.toggle(
-      'bg-green-500',
-      !isStockInWatchlist(symbol)
-    );
-    addToWatchlistBtn.classList.toggle(
-      'hover:bg-green-600',
-      !isStockInWatchlist(symbol)
-    );
-  }
-}
-
-addToWatchlistBtn.addEventListener('click', () => {
-  const symbol = searchInput.value.toUpperCase().trim();
-  toggleWatchlist(symbol);
-});
-
-const newsFeedDiv = document.getElementById('news-feed');
+// ---------------- News Feed (assumes dummyNews exists) ----------------
+const newsFeedDiv = document.getElementById("news-feed");
 function populateNewsFeed() {
-  const currentSymbol = searchInput.value.toUpperCase().trim();
-  let filteredNews = dummyNews;
+  const currentSymbol = (searchInput?.value || "").toUpperCase().trim();
+  let filteredNews = typeof dummyNews !== "undefined" ? dummyNews : [];
   if (currentSymbol && dummyStockData[currentSymbol]) {
-    const symbolSpecificNews = dummyNews.filter(
-      (news) => news.symbol === currentSymbol
-    );
-    const generalNews = dummyNews.filter(
-      (news) => news.symbol === 'General' || news.symbol !== currentSymbol
-    );
+    const symbolSpecificNews = filteredNews.filter((news) => news.symbol === currentSymbol);
+    const generalNews = filteredNews.filter((news) => news.symbol === "General" || news.symbol !== currentSymbol);
     filteredNews = [...symbolSpecificNews, ...generalNews].slice(0, 5);
   } else {
-    filteredNews = dummyNews.slice(0, 5);
+    filteredNews = filteredNews.slice(0, 5);
   }
 
+  if (!newsFeedDiv) return;
   newsFeedDiv.innerHTML = filteredNews.length
     ? filteredNews
         .map(
@@ -861,149 +810,168 @@ function populateNewsFeed() {
       </div>
             `
         )
-        .join('')
+        .join("")
     : '<p class="text-sm text-gray-500 dark:text-gray-400">No news available at the moment.</p>';
 }
 
-searchButton.addEventListener('click', populateNewsFeed);
-searchInput.addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') {
-    populateNewsFeed();
-  }
-});
+if (searchButton) searchButton.addEventListener("click", populateNewsFeed);
+if (searchInput) {
+  searchInput.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") populateNewsFeed();
+  });
+}
 
+// ---------------- Auth UI (merged & safe) ----------------
 function updateAuthUI() {
   const buyBtn = document.getElementById("buyBtn");
   const sellBtn = document.getElementById("sellBtn");
+  const loginBtnNavLocal = document.getElementById("loginBtnNav");
+  const loginBtnMobileLocal = document.getElementById("loginBtnMobile");
 
-  if (!buyBtn || !sellBtn) return;
+  if (buyBtn) buyBtn.disabled = !currentUser;
+  if (sellBtn) sellBtn.disabled = !currentUser;
 
-  if (currentUser) {
-    buyBtn.disabled = false;
-    sellBtn.disabled = false;
-  } else {
-    buyBtn.disabled = true;
-    sellBtn.disabled = true;
-  }
-}
+  if (loginBtnNavLocal) loginBtnNavLocal.textContent = currentUser ? "Dashboard" : "Login";
+  if (loginBtnMobileLocal) loginBtnMobileLocal.textContent = currentUser ? "Dashboard" : "Login";
 
-document.getElementById("buyBtn").addEventListener("click", () => {
-  if (!currentUser) {
-    openModal(loginModal);
-    return;
-  }
-  alert("Buy flow coming next 🚀");
-});
-
-document.getElementById("sellBtn").addEventListener("click", () => {
-  if (!currentUser) {
-    openModal(loginModal);
-    return;
-  }
-  alert("Sell flow coming next 🚀");
-});
-
-function updateAuthUI() {
-  const loginBtnNav = document.getElementById("loginBtnNav");
-  const loginBtnMobile = document.getElementById("loginBtnMobile");
+  // show/hide tc balance and load balances/portfolio if logged in
+  const tcEl = document.getElementById("tcBalance");
+  if (tcEl) tcEl.style.display = currentUser ? "inline-block" : "none";
 
   if (currentUser) {
-    loginBtnNav.textContent = "Dashboard";
-    loginBtnMobile.textContent = "Dashboard";
-  } else {
-    loginBtnNav.textContent = "Login";
-    loginBtnMobile.textContent = "Login";
+    loadBalance();
+    loadPortfolio();
   }
 }
 
-document.getElementById("registerForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-
-  const username = document.getElementById("register-username").value;
-  const email = document.getElementById("register-email").value;
-  const password = document.getElementById("register-password").value;
-
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
+// Buy/Sell quick handlers
+const buyBtnEl = document.getElementById("buyBtn");
+if (buyBtnEl) {
+  buyBtnEl.addEventListener("click", () => {
+    if (!currentUser) {
+      openModal(loginModal);
+      return;
+    }
+    alert("Buy flow coming next 🚀");
   });
-
-  if (error) {
-    alert(error.message);
-    return;
-  }
-
-  const user = data.user;
-
-  await supabase.from("profiles").insert({
-    id: user.id,
-    username,
-    membership: "PPM",
-    tc_balance: 100
+}
+const sellBtnEl = document.getElementById("sellBtn");
+if (sellBtnEl) {
+  sellBtnEl.addEventListener("click", () => {
+    if (!currentUser) {
+      openModal(loginModal);
+      return;
+    }
+    alert("Sell flow coming next 🚀");
   });
-
-  alert("Account created! You can now log in.");
-});
-
-document.getElementById("loginForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-
-  const email = document.getElementById("login-email").value;
-  const password = document.getElementById("login-password").value;
-
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
-    password
-  });
-
-  if (error) {
-    alert(error.message);
-  } else {
-    alert("Logged in successfully!");
-    closeModal(loginModal);
-  }
-});
-
-const { data: { user } } = await supabase.auth.getUser();
-if (!user) {
-  alert("Please log in to set alerts");
-  return;
 }
 
-document.getElementById('currentYear').textContent = new Date().getFullYear();
+// ---------------- Auth forms ----------------
+const registerForm = document.getElementById("registerForm");
+if (registerForm) {
+  registerForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
 
-document.addEventListener('DOMContentLoaded', () => {
+    const username = document.getElementById("register-username").value;
+    const email = document.getElementById("register-email").value;
+    const password = document.getElementById("register-password").value;
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    const user = data.user;
+
+    // Everyone starts with 100,000 TC by default
+    await supabase.from("profiles").insert({
+      id: user.id,
+      username,
+      membership: "PPM",
+      tc_balance: 100000,
+    });
+
+    alert("Account created! You can now log in.");
+    closeModal(registerModal);
+    openModal(loginModal);
+  });
+}
+
+const loginForm = document.getElementById("loginForm");
+if (loginForm) {
+  loginForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const email = document.getElementById("login-email").value;
+    const password = document.getElementById("login-password").value;
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      alert(error.message);
+    } else {
+      alert("Logged in successfully!");
+      closeModal(loginModal);
+    }
+  });
+}
+
+// Get current user once (wrapped to avoid top-level await)
+// We set currentUser if present and update UI accordingly
+(async () => {
+  try {
+    const res = await supabase.auth.getUser();
+    const user = res?.data?.user || null;
+    currentUser = user;
+    updateAuthUI();
+  } catch (err) {
+    // ignore non-fatal
+    console.warn("Unable to auto-fetch user at load:", err);
+  }
+})();
+
+// ---------------- Misc init ----------------
+const currentYearEl = document.getElementById("currentYear");
+if (currentYearEl) currentYearEl.textContent = new Date().getFullYear();
+
+document.addEventListener("DOMContentLoaded", () => {
   renderWatchlist();
   populateNewsFeed();
   displayStockDetails(null);
-  if (!searchInput.value) {
-    searchInput.value = 'AAPL';
+  if (!searchInput?.value) {
+    if (searchInput) searchInput.value = "AAPL";
     performSearch();
   }
 
   document.querySelectorAll('nav a[href^="#"]').forEach((anchor) => {
-    anchor.addEventListener('click', function (e) {
+    anchor.addEventListener("click", function (e) {
       e.preventDefault();
-      const targetId = this.getAttribute('href');
+      const targetId = this.getAttribute("href");
       const targetElement = document.querySelector(targetId);
       if (targetElement) {
-        const navbarHeight = document.querySelector('nav').offsetHeight;
-        const tickerHeight =
-          document.querySelector('.ticker-wrap').offsetHeight;
-        const offsetPosition =
-          targetElement.offsetTop - navbarHeight - tickerHeight - 20;
+        const navbarHeight = document.querySelector("nav")?.offsetHeight || 0;
+        const tickerHeight = document.querySelector(".ticker-wrap")?.offsetHeight || 0;
+        const offsetPosition = targetElement.offsetTop - navbarHeight - tickerHeight - 20;
 
         window.scrollTo({
           top: offsetPosition,
-          behavior: 'smooth',
+          behavior: "smooth",
         });
 
-        if (!mobileMenu.classList.contains('hidden')) {
-          mobileMenu.classList.add('hidden');
-          mobileMenuButton.setAttribute('aria-expanded', 'false');
+        if (!mobileMenu.classList.contains("hidden")) {
+          mobileMenu.classList.add("hidden");
+          mobileMenuButton.setAttribute("aria-expanded", "false");
           mobileMenuButton
-            .querySelectorAll('svg')
-            .forEach((icon) => icon.classList.toggle('hidden'));
+            .querySelectorAll("svg")
+            .forEach((icon) => icon.classList.toggle("hidden"));
         }
       }
     });
