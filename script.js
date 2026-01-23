@@ -60,7 +60,7 @@ if (themeToggleBtn) {
     localStorage.setItem("color-theme", currentTheme);
     if (chartInstance) {
       const symbol =
-        document.getElementById("stock-search").value.toUpperCase() || "AAPL";
+        document.getElementById("stock-search").value.toUpperCase() || "TTCO";
       renderChart(generateStockData(100), currentTheme, symbol);
     }
   });
@@ -593,7 +593,7 @@ function renderChart(data, theme, symbol) {
 }
 
 // initial render
-renderChart(generateStockData(100), localStorage.getItem("color-theme") || "light", "AAPL");
+renderChart(generateStockData(100), localStorage.getItem("color-theme") || "light", "TTCO");
 
 // ---------------- Market Movers ----------------
 const topGainersList = document.getElementById("top-gainers-list");
@@ -947,7 +947,7 @@ document.addEventListener("DOMContentLoaded", () => {
   populateNewsFeed();
   displayStockDetails(null);
   if (!searchInput?.value) {
-    if (searchInput) searchInput.value = "AAPL";
+    if (searchInput) searchInput.value = "TTCO";
     performSearch();
   }
 
@@ -977,3 +977,4 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 });
+
