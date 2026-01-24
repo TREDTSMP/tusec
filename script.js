@@ -761,7 +761,7 @@ async function loadPortfolio() {
     .select("*")
     .eq("user_id", currentUser.id);
 
-  const container = document.getElementById("watchlist-items");
+ const container = document.getElementById("portfolio-items");
   if (!container) return;
   container.innerHTML = "";
 
@@ -998,5 +998,6 @@ updateMarketStatusUI();
     });
   });
 });
+
 
 
