@@ -27,6 +27,46 @@ async function loadBalance() {
   }
 }
 
+let currentPrice = null
+let priceInterval = null
+let currentSymbol = null
+startFakeMarket()
+function startFakeMarket() {
+  if (priceInterval) clearInterval(priceInterval)
+
+  priceInterval = setInterval(() => {
+    if (!currentPrice) return
+
+    // Random movement: ±0.2%
+    const volatility = 0.002
+    const change = currentPrice * volatility * (Math.random() - 0.5)
+
+    currentPrice = Math.max(0.01, currentPrice + change)
+
+    updatePriceUI(currentPrice)
+    updateChartPrice(currentPrice)
+  }, 5000)
+}
+
+function updatePriceUI(price) {
+  const details = document.getElementById("stock-details")
+  if (!details) return
+
+  details.innerHTML = `
+    <p><strong>Price:</strong> $${price.toFixed(2)}</p>
+  `
+}
+
+function updateChartPrice(price) {
+  if (!window.priceSeries) return
+
+  priceSeries.update({
+    time: Math.floor(Date.now() / 1000),
+    value: Number(price.toFixed(2))
+  })
+}
+window.priceSeries = chart.addLineSeries()
+
 /* ------------------ Auth state ------------------ */
 supabase.auth.onAuthStateChange((_event, session) => {
   currentUser = session?.user || null;
@@ -1056,3 +1096,4 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 });
+
