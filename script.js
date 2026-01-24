@@ -27,45 +27,51 @@ async function loadBalance() {
   }
 }
 
-let currentPrice = null
-let priceInterval = null
-let currentSymbol = null
-startFakeMarket()
-function startFakeMarket() {
-  if (priceInterval) clearInterval(priceInterval)
+/* ------------------ PRICE ENGINE (5s TICK) ------------------ */
 
-  priceInterval = setInterval(() => {
-    if (!currentPrice) return
+const MAX_PRICE = 200000;
+const MIN_PRICE = 0;
 
-    // Random movement: ±0.2%
-    const volatility = 0.002
-    const change = currentPrice * volatility * (Math.random() - 0.5)
+function updateStockPrices() {
+  Object.keys(dummyStockData).forEach(symbol => {
+    const stock = dummyStockData[symbol];
 
-    currentPrice = Math.max(0.01, currentPrice + change)
+    const oldPrice = stock.price;
 
-    updatePriceUI(currentPrice)
-    updateChartPrice(currentPrice)
-  }, 5000)
+    // random movement ±0.5% to ±2%
+    const direction = Math.random() < 0.5 ? -1 : 1;
+    const magnitude = Math.random() * 0.02 + 0.005; // 0.5%–2.5%
+    let newPrice = oldPrice + oldPrice * magnitude * direction;
+
+    // clamp to limits
+    if (newPrice > MAX_PRICE) newPrice = MAX_PRICE;
+    if (newPrice < MIN_PRICE) newPrice = MIN_PRICE;
+
+    const change = newPrice - oldPrice;
+    const changePercent = (change / oldPrice) * 100;
+
+    stock.price = Number(newPrice.toFixed(2));
+    stock.change = `${change >= 0 ? "+" : ""}${change.toFixed(2)}`;
+    stock.changePercent = `${changePercent >= 0 ? "+" : ""}${changePercent.toFixed(2)}%`;
+
+    stock.high = Math.max(stock.high, stock.price);
+    stock.low = Math.min(stock.low, stock.price);
+    stock.dayHigh = Math.max(stock.dayHigh, stock.price);
+    stock.dayLow = Math.min(stock.dayLow, stock.price);
+  });
+
+  // refresh UI
+  populateMarketMovers();
+  renderWatchlist();
+
+  const currentSymbol = (searchInput?.value || "").toUpperCase().trim();
+  if (dummyStockData[currentSymbol]) {
+    displayStockDetails(currentSymbol);
+  }
 }
 
-function updatePriceUI(price) {
-  const details = document.getElementById("stock-details")
-  if (!details) return
-
-  details.innerHTML = `
-    <p><strong>Price:</strong> $${price.toFixed(2)}</p>
-  `
-}
-
-function updateChartPrice(price) {
-  if (!window.priceSeries) return
-
-  priceSeries.update({
-    time: Math.floor(Date.now() / 1000),
-    value: Number(price.toFixed(2))
-  })
-}
-window.priceSeries = chart.addLineSeries()
+// 🔁 Run every 5 seconds
+setInterval(updateStockPrices, 5000);
 
 /* ------------------ Auth state ------------------ */
 supabase.auth.onAuthStateChange((_event, session) => {
@@ -1096,4 +1102,5 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 });
+
 
