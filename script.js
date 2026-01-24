@@ -7,6 +7,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 let currentUser = null;
 
+/* ------------------ Balance loader ------------------ */
 async function loadBalance() {
   if (!currentUser) return;
 
@@ -17,7 +18,7 @@ async function loadBalance() {
     .single();
 
   if (!error && data) {
-    const balance = typeof data.tc_balance === "number" ? data.tc_balance : 0;
+    const balance = typeof data.tc_balance === "number" ? data.tc_balance : Number(data.tc_balance) || 0;
     const el = document.getElementById("tcBalance");
     if (el) {
       el.textContent = balance.toFixed(2) + " TC";
@@ -26,12 +27,13 @@ async function loadBalance() {
   }
 }
 
+/* ------------------ Auth state ------------------ */
 supabase.auth.onAuthStateChange((_event, session) => {
   currentUser = session?.user || null;
   updateAuthUI();
 });
 
-// ---------------- Theme & UI ----------------
+/* ------------------ Theme & UI ------------------ */
 const themeToggleBtn = document.getElementById("theme-toggle");
 const themeToggleDarkIcon = document.getElementById("theme-toggle-dark-icon");
 const themeToggleLightIcon = document.getElementById("theme-toggle-light-icon");
@@ -66,11 +68,11 @@ if (themeToggleBtn) {
   });
 }
 
+/* ------------------ Basic DOM refs ------------------ */
 const tcBalanceEl = document.getElementById("tcBalance");
 if (tcBalanceEl) {
   tcBalanceEl.style.display = currentUser ? "inline-block" : "none";
 }
-
 const mobileMenuButton = document.getElementById("mobile-menu-button");
 const mobileMenu = document.getElementById("mobile-menu");
 if (mobileMenuButton && mobileMenu) {
@@ -85,7 +87,7 @@ if (mobileMenuButton && mobileMenu) {
   });
 }
 
-// Modals & modal helpers
+/* ------------------ Modals ------------------ */
 const loginModal = document.getElementById("loginModal");
 const registerModal = document.getElementById("registerModal");
 const priceAlertModal = document.getElementById("priceAlertModal");
@@ -94,10 +96,8 @@ const loginBtnNav = document.getElementById("loginBtnNav");
 const loginBtnMobile = document.getElementById("loginBtnMobile");
 const closeLoginModalBtn = document.getElementById("closeLoginModal");
 const switchToRegisterBtn = document.getElementById("switchToRegister");
-
 const closeRegisterModalBtn = document.getElementById("closeRegisterModal");
 const switchToLoginBtn = document.getElementById("switchToLogin");
-
 const setPriceAlertBtn = document.getElementById("setPriceAlertBtn");
 const closePriceAlertModalBtn = document.getElementById("closePriceAlertModal");
 
@@ -161,13 +161,14 @@ if (setPriceAlertBtn) {
 if (closePriceAlertModalBtn)
   closePriceAlertModalBtn.addEventListener("click", () => closeModal(priceAlertModal));
 
-// ================= Market Hours =================
+/* ------------------ Market hours ------------------ */
 function isMarketOpen() {
   const now = new Date();
   const hour = now.getHours();
   return hour >= 6 && hour < 24; // 6:00 AM → 12:00 Midnight
 }
 
+/* ------------------ Stock data ------------------ */
 const initialStockPrices = {
   RTCO: {
     name: 'Royal Trading Company',
@@ -363,7 +364,7 @@ Object.entries(initialStockPrices).forEach(([symbol, stock]) => {
   };
 });
 
-// Ticker populate
+/* ------------------ Ticker ------------------ */
 const tickerMove = document.querySelector(".ticker-move");
 function populateTicker() {
   if (!tickerMove) return;
@@ -388,7 +389,9 @@ function populateTicker() {
 }
 populateTicker();
 
-// Update stock prices periodically but only during market hours
+/* ------------------ Market simulation (5s) ------------------ */
+const MAX_PRICE = 200000;
+
 setInterval(() => {
   if (!isMarketOpen()) {
     // Market closed — don't simulate intraday movement
@@ -400,9 +403,9 @@ setInterval(() => {
     stock.price = parseFloat((stock.price + randomChange).toFixed(2));
     if (stock.price < 0) stock.price = 0.1;
 
-    const oldChangeVal = parseFloat(stock.change) || 0;
+    const oldChangeVal = parseFloat(String(stock.change).replace("+", "")) || 0;
     const newChangeVal = parseFloat((oldChangeVal + (Math.random() * 0.1 - 0.05)).toFixed(2));
-    const newChangePercentVal = parseFloat(((newChangeVal / (Math.max(0.01, stock.price - newChangeVal))) * 100).toFixed(2));
+    const newChangePercentVal = parseFloat(((newChangeVal / Math.max(0.01, stock.price - newChangeVal)) * 100).toFixed(2));
 
     stock.change = (newChangeVal > 0 ? "+" : "") + newChangeVal.toFixed(2);
     stock.changePercent = (newChangeVal > 0 ? "+" : "") + newChangePercentVal.toFixed(2) + "%";
@@ -410,16 +413,21 @@ setInterval(() => {
     // update dayHigh/dayLow
     stock.dayHigh = Math.max(stock.dayHigh ?? stock.price, stock.price);
     stock.dayLow = Math.min(stock.dayLow ?? stock.price, stock.price);
+
+    // MAX ceiling behaviour - gently push price back toward initial if it breaches the ceiling
+    if (stock.price >= MAX_PRICE) {
+      // slowly move toward initial value
+      const diff = stock.price - stock.initial;
+      const cooldown = Math.min(Math.max(50, diff * 0.08), diff);
+      stock.price = parseFloat((stock.price - cooldown).toFixed(2));
+      // ensure we don't create negative or NaN
+      if (!isFinite(stock.price) || stock.price <= 0) stock.price = stock.initial;
+    }
   });
   populateTicker();
 }, 5000);
-const MAX_PRICE = 200000;
 
-if (stock.price >= MAX_PRICE) {
-  stock.price -= Math.random() * 500; // slow cooldown
-}
-
-// ---------------- Search / Details / Chart ----------------
+/* ------------------ Search / Chart / Details ------------------ */
 const searchInput = document.getElementById("stock-search");
 const searchButton = document.getElementById("search-button");
 const stockDetailsDiv = document.getElementById("stock-details");
@@ -447,7 +455,6 @@ function performSearch() {
       if (loader) loader.classList.remove("hidden");
     }
     if (addToWatchlistBtn) addToWatchlistBtn.disabled = true;
-    if (setPriceAlertBtn) setPriceAlertBtn.disabled = true;
     return;
   }
 
@@ -467,7 +474,6 @@ function performSearch() {
       addToWatchlistBtn.classList.toggle("bg-green-500", !inWL);
       addToWatchlistBtn.classList.toggle("hover:bg-green-600", !inWL);
     }
-    if (setPriceAlertBtn) setPriceAlertBtn.disabled = false;
   } else {
     if (searchErrorDiv) searchErrorDiv.classList.remove("hidden");
     if (chartInstance) {
@@ -477,7 +483,6 @@ function performSearch() {
       if (loader) loader.classList.remove("hidden");
     }
     if (addToWatchlistBtn) addToWatchlistBtn.disabled = true;
-    if (setPriceAlertBtn) setPriceAlertBtn.disabled = true;
   }
 }
 
@@ -490,7 +495,7 @@ function displayStockDetails(stock, symbol = "N/A") {
     if (stockDetailsDiv) {
       stockDetailsDiv.innerHTML = `
       <div class="flex justify-between items-baseline">
-          <p class="text-3xl font-bold">${stock.price.toFixed(2)} <span class="text-xs text-gray-500 dark:text-gray-400">USD</span></p>
+          <p class="text-3xl font-bold">${Number(stock.price).toFixed(2)} <span class="text-xs text-gray-500 dark:text-gray-400">TC</span></p>
           <p class="text-lg ${changeClass}">${stock.change} (${stock.changePercent})</p>
       </div>
       <hr class="my-2 border-gray-200 dark:border-gray-600">
@@ -510,6 +515,7 @@ function displayStockDetails(stock, symbol = "N/A") {
   }
 }
 
+/* ------------------ Chart helpers (unchanged) ------------------ */
 function generateStockData(count) {
   const data = [];
   let lastClose = 50 + Math.random() * 150;
@@ -597,10 +603,10 @@ function renderChart(data, theme, symbol) {
   });
 }
 
-// initial render
+/* ------------------ initial chart ------------------ */
 renderChart(generateStockData(100), localStorage.getItem("color-theme") || "light", "TTCO");
 
-// ---------------- Market Movers ----------------
+/* ------------------ Market Movers ------------------ */
 const topGainersList = document.getElementById("top-gainers-list");
 const topLosersList = document.getElementById("top-losers-list");
 
@@ -669,7 +675,7 @@ function populateMarketMovers() {
 populateMarketMovers();
 setInterval(populateMarketMovers, 15000);
 
-// ---------------- Watchlist & Portfolio ----------------
+/* ------------------ Watchlist & Portfolio ------------------ */
 const watchlistItemsDiv = document.getElementById("watchlist-items");
 const emptyWatchlistMessage = document.getElementById("empty-watchlist-message");
 let watchlist = JSON.parse(localStorage.getItem("stockWatchlist") || "[]");
@@ -752,7 +758,7 @@ if (addToWatchlistBtn) {
   });
 }
 
-// Load portfolio (kept separate and global)
+/* ------------------ Portfolio loader ------------------ */
 async function loadPortfolio() {
   if (!currentUser) return;
 
@@ -761,7 +767,8 @@ async function loadPortfolio() {
     .select("*")
     .eq("user_id", currentUser.id);
 
- const container = document.getElementById("portfolio-items");
+  // prefer dedicated portfolio container if present
+  const container = document.getElementById("portfolio-items") || document.getElementById("watchlist-items");
   if (!container) return;
   container.innerHTML = "";
 
@@ -786,7 +793,7 @@ async function loadPortfolio() {
   });
 }
 
-// ---------------- News Feed (assumes dummyNews exists) ----------------
+/* ------------------ News feed (unchanged) ------------------ */
 const newsFeedDiv = document.getElementById("news-feed");
 function populateNewsFeed() {
   const currentSymbol = (searchInput?.value || "").toUpperCase().trim();
@@ -826,7 +833,7 @@ if (searchInput) {
   });
 }
 
-// ---------------- Auth UI (merged & safe) ----------------
+/* ------------------ Auth UI ------------------ */
 function updateAuthUI() {
   const buyBtn = document.getElementById("buyBtn");
   const sellBtn = document.getElementById("sellBtn");
@@ -849,29 +856,82 @@ function updateAuthUI() {
   }
 }
 
-// Buy/Sell quick handlers
+/* ------------------ RPC-based buy/sell (atomic) ------------------ */
+async function buyStock(symbol, quantity) {
+  if (!currentUser) return alert("Please log in to trade.");
+
+  const stock = dummyStockData[symbol];
+  if (!stock) return alert("Invalid stock symbol.");
+
+  const { error } = await supabase.rpc("buy_stock", {
+    p_symbol: symbol,
+    p_quantity: quantity,
+    p_price: stock.price,
+  });
+
+  if (error) {
+    alert(error.message || "Buy failed");
+    return;
+  }
+
+  alert(`Bought ${quantity} ${symbol}`);
+  loadBalance();
+  loadPortfolio();
+}
+
+async function sellStock(symbol, quantity) {
+  if (!currentUser) return alert("Please log in to trade.");
+
+  const stock = dummyStockData[symbol];
+  if (!stock) return alert("Invalid stock symbol.");
+
+  const { error } = await supabase.rpc("sell_stock", {
+    p_symbol: symbol,
+    p_quantity: quantity,
+    p_price: stock.price,
+  });
+
+  if (error) {
+    alert(error.message || "Sell failed");
+    return;
+  }
+
+  alert(`Sold ${quantity} ${symbol}`);
+  loadBalance();
+  loadPortfolio();
+}
+
+/* ------------------ Single BUY/SELL listeners (only once) ------------------ */
 const buyBtnEl = document.getElementById("buyBtn");
+const sellBtnEl = document.getElementById("sellBtn");
+
 if (buyBtnEl) {
   buyBtnEl.addEventListener("click", () => {
     if (!currentUser) {
       openModal(loginModal);
       return;
     }
-    alert("Buy flow coming next 🚀");
+    const symbol = (searchInput?.value || "").toUpperCase().trim();
+    const qty = Number(prompt(`Buy how many shares of ${symbol}?`));
+    if (!symbol || !qty || qty <= 0) return;
+    buyStock(symbol, qty);
   });
 }
-const sellBtnEl = document.getElementById("sellBtn");
+
 if (sellBtnEl) {
   sellBtnEl.addEventListener("click", () => {
     if (!currentUser) {
       openModal(loginModal);
       return;
     }
-    alert("Sell flow coming next 🚀");
+    const symbol = (searchInput?.value || "").toUpperCase().trim();
+    const qty = Number(prompt(`Sell how many shares of ${symbol}?`));
+    if (!symbol || !qty || qty <= 0) return;
+    sellStock(symbol, qty);
   });
 }
 
-// ---------------- Auth forms ----------------
+/* ------------------ Auth forms ------------------ */
 const registerForm = document.getElementById("registerForm");
 if (registerForm) {
   registerForm.addEventListener("submit", async (e) => {
@@ -897,7 +957,6 @@ if (registerForm) {
     await supabase.from("profiles").insert({
       id: user.id,
       username,
-      membership: "PPM",
       tc_balance: 100000,
     });
 
@@ -929,8 +988,7 @@ if (loginForm) {
   });
 }
 
-// Get current user once (wrapped to avoid top-level await)
-// We set currentUser if present and update UI accordingly
+/* ------------------ Auto-check user at load ------------------ */
 (async () => {
   try {
     const res = await supabase.auth.getUser();
@@ -938,12 +996,11 @@ if (loginForm) {
     currentUser = user;
     updateAuthUI();
   } catch (err) {
-    // ignore non-fatal
     console.warn("Unable to auto-fetch user at load:", err);
   }
 })();
 
-// ---------------- Misc init ----------------
+/* ------------------ Misc init ------------------ */
 const currentYearEl = document.getElementById("currentYear");
 if (currentYearEl) currentYearEl.textContent = new Date().getFullYear();
 
@@ -956,21 +1013,22 @@ document.addEventListener("DOMContentLoaded", () => {
     performSearch();
   }
 
-function updateMarketStatusUI() {
-  const el = document.getElementById("marketStatus");
-  if (!el) return;
+  // market status UI (optional element)
+  function updateMarketStatusUI() {
+    const el = document.getElementById("marketStatus");
+    if (!el) return;
 
-  if (isMarketOpen()) {
-    el.textContent = "Market Open";
-    el.className = "text-green-500 font-semibold";
-  } else {
-    el.textContent = "Market Closed";
-    el.className = "text-red-500 font-semibold";
+    if (isMarketOpen()) {
+      el.textContent = "Market Open";
+      el.className = "text-green-500 font-semibold";
+    } else {
+      el.textContent = "Market Closed";
+      el.className = "text-red-500 font-semibold";
+    }
   }
-}
 
-setInterval(updateMarketStatusUI, 60000);
-updateMarketStatusUI();
+  setInterval(updateMarketStatusUI, 60000);
+  updateMarketStatusUI();
 
   document.querySelectorAll('nav a[href^="#"]').forEach((anchor) => {
     anchor.addEventListener("click", function (e) {
@@ -998,6 +1056,3 @@ updateMarketStatusUI();
     });
   });
 });
-
-
-
