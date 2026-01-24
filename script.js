@@ -413,6 +413,11 @@ setInterval(() => {
   });
   populateTicker();
 }, 5000);
+const MAX_PRICE = 200000;
+
+if (stock.price >= MAX_PRICE) {
+  stock.price -= Math.random() * 500; // slow cooldown
+}
 
 // ---------------- Search / Details / Chart ----------------
 const searchInput = document.getElementById("stock-search");
@@ -951,6 +956,22 @@ document.addEventListener("DOMContentLoaded", () => {
     performSearch();
   }
 
+function updateMarketStatusUI() {
+  const el = document.getElementById("marketStatus");
+  if (!el) return;
+
+  if (isMarketOpen()) {
+    el.textContent = "Market Open";
+    el.className = "text-green-500 font-semibold";
+  } else {
+    el.textContent = "Market Closed";
+    el.className = "text-red-500 font-semibold";
+  }
+}
+
+setInterval(updateMarketStatusUI, 60000);
+updateMarketStatusUI();
+
   document.querySelectorAll('nav a[href^="#"]').forEach((anchor) => {
     anchor.addEventListener("click", function (e) {
       e.preventDefault();
@@ -977,4 +998,5 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 });
+
 
