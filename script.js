@@ -28,50 +28,74 @@ async function loadBalance() {
 }
 
 /* ------------------ PRICE ENGINE (5s TICK) ------------------ */
+/* Single authoritative engine that updates all prices every 5s. */
 
-const MAX_PRICE = 200000;
+const MAX_PRICE = 200000; // single definition
 const MIN_PRICE = 0;
 
 function updateStockPrices() {
-  Object.keys(dummyStockData).forEach(symbol => {
+  // Respect market hours
+  if (!isMarketOpen()) {
+    // update UI to show market closed but do not change prices
+    populateMarketMovers();
+    populateTicker();
+    renderWatchlistIfNeeded();
+    return;
+  }
+
+  Object.keys(dummyStockData).forEach((symbol) => {
     const stock = dummyStockData[symbol];
+    const oldPrice = Number(stock.price) || 0;
 
-    const oldPrice = stock.price;
-
-    // random movement ±0.5% to ±2%
+    // Random movement: ±0.5% to ±2.5% of current price
     const direction = Math.random() < 0.5 ? -1 : 1;
     const magnitude = Math.random() * 0.02 + 0.005; // 0.5%–2.5%
     let newPrice = oldPrice + oldPrice * magnitude * direction;
 
-    // clamp to limits
+    // If price goes negative, clamp
+    if (!isFinite(newPrice) || newPrice <= 0) newPrice = Math.max(0.01, oldPrice * (1 + (Math.random() - 0.5) * 0.01));
+
+    // MAX ceiling behaviour - gently push price back toward initial if it breaches the ceiling
+    if (newPrice >= MAX_PRICE) {
+      const diff = newPrice - (stock.initial || oldPrice);
+      // gentle cooldown
+      const cooldown = Math.min(Math.max(50, diff * 0.08), diff || 50);
+      newPrice = Math.max(MIN_PRICE + 0.01, newPrice - cooldown);
+    }
+
+    // clamp to absolute bounds
     if (newPrice > MAX_PRICE) newPrice = MAX_PRICE;
     if (newPrice < MIN_PRICE) newPrice = MIN_PRICE;
 
     const change = newPrice - oldPrice;
-    const changePercent = (change / oldPrice) * 100;
+    const changePercent = oldPrice > 0 ? (change / oldPrice) * 100 : 0;
 
     stock.price = Number(newPrice.toFixed(2));
     stock.change = `${change >= 0 ? "+" : ""}${change.toFixed(2)}`;
     stock.changePercent = `${changePercent >= 0 ? "+" : ""}${changePercent.toFixed(2)}%`;
 
-    stock.high = Math.max(stock.high, stock.price);
-    stock.low = Math.min(stock.low, stock.price);
-    stock.dayHigh = Math.max(stock.dayHigh, stock.price);
-    stock.dayLow = Math.min(stock.dayLow, stock.price);
+    // update intraday extremes
+    stock.high = Math.max(Number(stock.high || stock.price), stock.price);
+    stock.low = Math.min(Number(stock.low || stock.price), stock.price);
+    stock.dayHigh = Math.max(Number(stock.dayHigh || stock.price), stock.price);
+    stock.dayLow = Math.min(Number(stock.dayLow || stock.price), stock.price);
   });
 
-  // refresh UI
+  // refresh UI components
   populateMarketMovers();
+  populateTicker();
   renderWatchlist();
 
+  // If a symbol is currently selected in the search input, refresh its details
   const currentSymbol = (searchInput?.value || "").toUpperCase().trim();
-  if (dummyStockData[currentSymbol]) {
-    displayStockDetails(currentSymbol);
+  if (currentSymbol && dummyStockData[currentSymbol]) {
+    displayStockDetails(dummyStockData[currentSymbol], currentSymbol);
   }
 }
 
-// 🔁 Run every 5 seconds
-setInterval(updateStockPrices, 5000);
+// Run every 5 seconds
+// Note: the setInterval is placed AFTER dummyStockData is built (later in file).
+// setInterval(updateStockPrices, 5000);  <-- this will be called once after dummyStockData is created
 
 /* ------------------ Auth state ------------------ */
 supabase.auth.onAuthStateChange((_event, session) => {
@@ -217,10 +241,10 @@ function isMarketOpen() {
 /* ------------------ Stock data ------------------ */
 const initialStockPrices = {
   RTCO: {
-    name: 'Royal Trading Company',
+    name: "Royal Trading Company",
     price: 12500,
-    change: '+0.00',
-    changePercent: '+0.00%',
+    change: "+0.00",
+    changePercent: "+0.00%",
     open: 12500,
     high: 12500,
     low: 12500,
@@ -228,10 +252,10 @@ const initialStockPrices = {
     dayLow: 12500,
   },
   UTCO: {
-    name: 'Union Technologies Inc.',
+    name: "Union Technologies Inc.",
     price: 18200,
-    change: '+0.00',
-    changePercent: '+0.00%',
+    change: "+0.00",
+    changePercent: "+0.00%",
     open: 18200,
     high: 18200,
     low: 18200,
@@ -239,10 +263,10 @@ const initialStockPrices = {
     dayLow: 18200,
   },
   TRI: {
-    name: 'TREDT Industries Inc.',
+    name: "TREDT Industries Inc.",
     price: 30500,
-    change: '+0.00',
-    changePercent: '+0.00%',
+    change: "+0.00",
+    changePercent: "+0.00%",
     open: 30500,
     high: 30500,
     low: 30500,
@@ -250,10 +274,10 @@ const initialStockPrices = {
     dayLow: 30500,
   },
   IBT: {
-    name: 'Imperial Bank of TREDT',
+    name: "Imperial Bank of TREDT",
     price: 45000,
-    change: '+0.00',
-    changePercent: '+0.00%',
+    change: "+0.00",
+    changePercent: "+0.00%",
     open: 45000,
     high: 45000,
     low: 45000,
@@ -261,10 +285,10 @@ const initialStockPrices = {
     dayLow: 45000,
   },
   VSB: {
-    name: 'Vizlandian State Bank',
+    name: "Vizlandian State Bank",
     price: 41000,
-    change: '+0.00',
-    changePercent: '+0.00%',
+    change: "+0.00",
+    changePercent: "+0.00%",
     open: 41000,
     high: 41000,
     low: 41000,
@@ -272,10 +296,10 @@ const initialStockPrices = {
     dayLow: 41000,
   },
   TIRC: {
-    name: 'TREDT Imperial Railways Company',
+    name: "TREDT Imperial Railways Company",
     price: 27800,
-    change: '+0.00',
-    changePercent: '+0.00%',
+    change: "+0.00",
+    changePercent: "+0.00%",
     open: 27800,
     high: 27800,
     low: 27800,
@@ -283,10 +307,10 @@ const initialStockPrices = {
     dayLow: 27800,
   },
   TTCO: {
-    name: 'TREDT Trading Company Pvt. Ltd.',
+    name: "TREDT Trading Company Pvt. Ltd.",
     price: 36000,
-    change: '+0.00',
-    changePercent: '+0.00%',
+    change: "+0.00",
+    changePercent: "+0.00%",
     open: 36000,
     high: 36000,
     low: 36000,
@@ -294,10 +318,10 @@ const initialStockPrices = {
     dayLow: 36000,
   },
   CBPSC: {
-    name: 'Crabland Black Powder & Smithing Company',
+    name: "Crabland Black Powder & Smithing Company",
     price: 22400,
-    change: '+0.00',
-    changePercent: '+0.00%',
+    change: "+0.00",
+    changePercent: "+0.00%",
     open: 22400,
     high: 22400,
     low: 22400,
@@ -305,10 +329,10 @@ const initialStockPrices = {
     dayLow: 22400,
   },
   VCGC: {
-    name: 'Vizlandia Grain & Winery Co.',
+    name: "Vizlandia Grain & Winery Co.",
     price: 19800,
-    change: '+0.00',
-    changePercent: '+0.00%',
+    change: "+0.00",
+    changePercent: "+0.00%",
     open: 19800,
     high: 19800,
     low: 19800,
@@ -316,10 +340,10 @@ const initialStockPrices = {
     dayLow: 19800,
   },
   LCEC: {
-    name: 'Lost City Exploration Company',
+    name: "Lost City Exploration Company",
     price: 54000,
-    change: '+0.00',
-    changePercent: '+0.00%',
+    change: "+0.00",
+    changePercent: "+0.00%",
     open: 54000,
     high: 54000,
     low: 54000,
@@ -327,10 +351,10 @@ const initialStockPrices = {
     dayLow: 54000,
   },
   FTM: {
-    name: 'Flanders Trading & Mercantile',
+    name: "Flanders Trading & Mercantile",
     price: 16700,
-    change: '+0.00',
-    changePercent: '+0.00%',
+    change: "+0.00",
+    changePercent: "+0.00%",
     open: 16700,
     high: 16700,
     low: 16700,
@@ -338,10 +362,10 @@ const initialStockPrices = {
     dayLow: 16700,
   },
   KIS: {
-    name: 'Kaisergrad Industrial Syndicate',
+    name: "Kaisergrad Industrial Syndicate",
     price: 62000,
-    change: '+0.00',
-    changePercent: '+0.00%',
+    change: "+0.00",
+    changePercent: "+0.00%",
     open: 62000,
     high: 62000,
     low: 62000,
@@ -349,10 +373,10 @@ const initialStockPrices = {
     dayLow: 62000,
   },
   TBC: {
-    name: 'Tsarland Broadcasting Company',
+    name: "Tsarland Broadcasting Company",
     price: 14400,
-    change: '+0.00',
-    changePercent: '+0.00%',
+    change: "+0.00",
+    changePercent: "+0.00%",
     open: 14400,
     high: 14400,
     low: 14400,
@@ -360,10 +384,10 @@ const initialStockPrices = {
     dayLow: 14400,
   },
   UDC: {
-    name: 'Crabland Defense Contractors Ltd.',
+    name: "Crabland Defense Contractors Ltd.",
     price: 71000,
-    change: '+0.00',
-    changePercent: '+0.00%',
+    change: "+0.00",
+    changePercent: "+0.00%",
     open: 71000,
     high: 71000,
     low: 71000,
@@ -371,10 +395,10 @@ const initialStockPrices = {
     dayLow: 71000,
   },
   CEDC: {
-    name: 'Crown Estate Development Corp.',
+    name: "Crown Estate Development Corp.",
     price: 38500,
-    change: '+0.00',
-    changePercent: '+0.00%',
+    change: "+0.00",
+    changePercent: "+0.00%",
     open: 38500,
     high: 38500,
     low: 38500,
@@ -382,10 +406,10 @@ const initialStockPrices = {
     dayLow: 38500,
   },
   BCC: {
-    name: 'Bob & Company',
+    name: "Bob & Company",
     price: 9500,
-    change: '+0.00',
-    changePercent: '+0.00%',
+    change: "+0.00",
+    changePercent: "+0.00%",
     open: 9500,
     high: 9500,
     low: 9500,
@@ -423,9 +447,9 @@ function populateTicker() {
         ? "text-green-400"
         : "text-red-400";
       tickerHTML += `
-        <div class="ticker-item inline-flex items-center">
+        <div class="ticker-item inline-flex items-center mr-6">
             <span class="font-semibold">${symbol}</span>
-            <span class="ml-2 text-sm">${stock.price.toFixed(2)}</span>
+            <span class="ml-2 text-sm">${Number(stock.price).toFixed(2)}</span>
             <span class="ml-1 text-xs ${changeClass}">${stock.change} (${stock.changePercent})</span>
         </div>
       `;
@@ -435,224 +459,7 @@ function populateTicker() {
 }
 populateTicker();
 
-/* ------------------ Market simulation (5s) ------------------ */
-const MAX_PRICE = 200000;
-
-setInterval(() => {
-  if (!isMarketOpen()) {
-    // Market closed — don't simulate intraday movement
-    return;
-  }
-  Object.keys(dummyStockData).forEach((symbol) => {
-    const stock = dummyStockData[symbol];
-    const randomChange = (Math.random() * 0.5 - 0.25); // -0.25 .. +0.25
-    stock.price = parseFloat((stock.price + randomChange).toFixed(2));
-    if (stock.price < 0) stock.price = 0.1;
-
-    const oldChangeVal = parseFloat(String(stock.change).replace("+", "")) || 0;
-    const newChangeVal = parseFloat((oldChangeVal + (Math.random() * 0.1 - 0.05)).toFixed(2));
-    const newChangePercentVal = parseFloat(((newChangeVal / Math.max(0.01, stock.price - newChangeVal)) * 100).toFixed(2));
-
-    stock.change = (newChangeVal > 0 ? "+" : "") + newChangeVal.toFixed(2);
-    stock.changePercent = (newChangeVal > 0 ? "+" : "") + newChangePercentVal.toFixed(2) + "%";
-
-    // update dayHigh/dayLow
-    stock.dayHigh = Math.max(stock.dayHigh ?? stock.price, stock.price);
-    stock.dayLow = Math.min(stock.dayLow ?? stock.price, stock.price);
-
-    // MAX ceiling behaviour - gently push price back toward initial if it breaches the ceiling
-    if (stock.price >= MAX_PRICE) {
-      // slowly move toward initial value
-      const diff = stock.price - stock.initial;
-      const cooldown = Math.min(Math.max(50, diff * 0.08), diff);
-      stock.price = parseFloat((stock.price - cooldown).toFixed(2));
-      // ensure we don't create negative or NaN
-      if (!isFinite(stock.price) || stock.price <= 0) stock.price = stock.initial;
-    }
-  });
-  populateTicker();
-}, 5000);
-
-/* ------------------ Search / Chart / Details ------------------ */
-const searchInput = document.getElementById("stock-search");
-const searchButton = document.getElementById("search-button");
-const stockDetailsDiv = document.getElementById("stock-details");
-const companyNameHeader = document.getElementById("company-name");
-const searchErrorDiv = document.getElementById("search-error");
-const addToWatchlistBtn = document.getElementById("addToWatchlistBtn");
-
-if (searchButton) searchButton.addEventListener("click", performSearch);
-if (searchInput) {
-  searchInput.addEventListener("keypress", (e) => {
-    if (e.key === "Enter") performSearch();
-  });
-}
-
-function performSearch() {
-  const searchTerm = (searchInput?.value || "").toUpperCase().trim();
-  if (searchErrorDiv) searchErrorDiv.classList.add("hidden");
-
-  if (!searchTerm) {
-    displayStockDetails(null);
-    if (chartInstance) {
-      chartInstance.remove();
-      chartInstance = null;
-      const loader = document.getElementById("chart-loader");
-      if (loader) loader.classList.remove("hidden");
-    }
-    if (addToWatchlistBtn) addToWatchlistBtn.disabled = true;
-    return;
-  }
-
-  const stock = dummyStockData[searchTerm];
-  displayStockDetails(stock, searchTerm);
-
-  if (stock) {
-    const loader = document.getElementById("chart-loader");
-    if (loader) loader.classList.remove("hidden");
-    renderChart(generateStockData(100), localStorage.getItem("color-theme") || "light", searchTerm);
-    if (addToWatchlistBtn) {
-      addToWatchlistBtn.disabled = false;
-      const inWL = isStockInWatchlist(searchTerm);
-      addToWatchlistBtn.textContent = inWL ? "Remove from Watchlist" : "Add to Watchlist";
-      addToWatchlistBtn.classList.toggle("bg-red-500", inWL);
-      addToWatchlistBtn.classList.toggle("hover:bg-red-600", inWL);
-      addToWatchlistBtn.classList.toggle("bg-green-500", !inWL);
-      addToWatchlistBtn.classList.toggle("hover:bg-green-600", !inWL);
-    }
-  } else {
-    if (searchErrorDiv) searchErrorDiv.classList.remove("hidden");
-    if (chartInstance) {
-      chartInstance.remove();
-      chartInstance = null;
-      const loader = document.getElementById("chart-loader");
-      if (loader) loader.classList.remove("hidden");
-    }
-    if (addToWatchlistBtn) addToWatchlistBtn.disabled = true;
-  }
-}
-
-function displayStockDetails(stock, symbol = "N/A") {
-  if (stock) {
-    if (companyNameHeader) companyNameHeader.textContent = `${stock.name} (${symbol})`;
-    const changeClass = stock.change && stock.change.startsWith("+")
-      ? "text-green-500 dark:text-green-400"
-      : "text-red-500 dark:text-red-400";
-    if (stockDetailsDiv) {
-      stockDetailsDiv.innerHTML = `
-      <div class="flex justify-between items-baseline">
-          <p class="text-3xl font-bold">${Number(stock.price).toFixed(2)} <span class="text-xs text-gray-500 dark:text-gray-400">TC</span></p>
-          <p class="text-lg ${changeClass}">${stock.change} (${stock.changePercent})</p>
-      </div>
-      <hr class="my-2 border-gray-200 dark:border-gray-600">
-      <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-          <p><strong>Open:</strong> ${Number(stock.open).toFixed(2)}</p>
-          <p><strong>High:</strong> ${Number(stock.high).toFixed(2)}</p>
-          <p><strong>Low:</strong> ${Number(stock.low).toFixed(2)}</p>
-          <p><strong>Day High:</strong> ${Number(stock.dayHigh).toFixed(2)}</p>
-          <p><strong>Day Low:</strong> ${Number(stock.dayLow).toFixed(2)}</p>
-      </div>
-      `;
-    }
-  } else {
-    if (companyNameHeader) companyNameHeader.textContent = "Company Overview";
-    if (stockDetailsDiv)
-      stockDetailsDiv.innerHTML = `<p class="text-sm text-gray-600 dark:text-gray-400">Search for a stock to see details.</p>`;
-  }
-}
-
-/* ------------------ Chart helpers (unchanged) ------------------ */
-function generateStockData(count) {
-  const data = [];
-  let lastClose = 50 + Math.random() * 150;
-  let time = new Date();
-  time.setDate(time.getDate() - count);
-
-  for (let i = 0; i < count; i++) {
-    time.setDate(time.getDate() + 1);
-    const open = lastClose + (Math.random() - 0.5) * 5;
-    const high = Math.max(open, lastClose) + Math.random() * 5;
-    const low = Math.min(open, lastClose) - Math.random() * 5;
-    const close = low + Math.random() * (high - low);
-    lastClose = close;
-
-    data.push({
-      time: time.toISOString().split("T")[0],
-      open: parseFloat(open.toFixed(2)),
-      high: parseFloat(high.toFixed(2)),
-      low: parseFloat(low.toFixed(2)),
-      close: parseFloat(close.toFixed(2)),
-    });
-  }
-  return data;
-}
-
-function renderChart(data, theme, symbol) {
-  const chartContainer = document.getElementById("chart-container");
-  const chartLoader = document.getElementById("chart-loader");
-
-  if (!chartContainer) return;
-
-  if (chartInstance) {
-    chartInstance.remove();
-  }
-
-  chartInstance = LightweightCharts.createChart(chartContainer, {
-    width: chartContainer.clientWidth,
-    height: chartContainer.clientHeight,
-    layout: {
-      backgroundColor: theme === "dark" ? "#1f2937" : "#ffffff",
-      textColor: theme === "dark" ? "#d1d5db" : "#111827",
-    },
-    grid: {
-      vertLines: { color: theme === "dark" ? "#374151" : "#e5e7eb" },
-      horzLines: { color: theme === "dark" ? "#374151" : "#e5e7eb" },
-    },
-    crosshair: {
-      mode: LightweightCharts.CrosshairMode.Normal,
-    },
-    priceScale: {
-      borderColor: theme === "dark" ? "#4b5563" : "#cccccc",
-    },
-    timeScale: {
-      borderColor: theme === "dark" ? "#4b5563" : "#cccccc",
-      timeVisible: true,
-      secondsVisible: false,
-    },
-    watermark: {
-      color: theme === "dark" ? "rgba(209, 213, 219, 0.1)" : "rgba(0, 0, 0, 0.1)",
-      visible: true,
-      text: symbol,
-      fontSize: 48,
-      horzAlign: "center",
-      vertAlign: "center",
-    },
-  });
-
-  const candleSeries = chartInstance.addCandlestickSeries({
-    upColor: theme === "dark" ? "#10b981" : "#22c55e",
-    downColor: theme === "dark" ? "#ef4444" : "#dc2626",
-    borderDownColor: theme === "dark" ? "#ef4444" : "#dc2626",
-    borderUpColor: theme === "dark" ? "#10b981" : "#22c55e",
-    wickDownColor: theme === "dark" ? "#ef4444" : "#dc2626",
-    wickUpColor: theme === "dark" ? "#10b981" : "#22c55e",
-  });
-
-  candleSeries.setData(data);
-  chartInstance.timeScale().fitContent();
-  if (chartLoader) chartLoader.classList.add("hidden");
-
-  window.addEventListener("resize", () => {
-    if (chartInstance && chartContainer.clientWidth > 0 && chartContainer.clientHeight > 0) {
-      chartInstance.resize(chartContainer.clientWidth, chartContainer.clientHeight);
-    }
-  });
-}
-
-/* ------------------ initial chart ------------------ */
-renderChart(generateStockData(100), localStorage.getItem("color-theme") || "light", "TTCO");
-
-/* ------------------ Market Movers ------------------ */
+/* ------------------ Market Movers (initial and periodic) ------------------ */
 const topGainersList = document.getElementById("top-gainers-list");
 const topLosersList = document.getElementById("top-losers-list");
 
@@ -802,6 +609,11 @@ if (addToWatchlistBtn) {
     const symbol = (searchInput?.value || "").toUpperCase().trim();
     toggleWatchlist(symbol);
   });
+}
+
+function renderWatchlistIfNeeded() {
+  // helper used by updateStockPrices when market closed
+  if (watchlist.length > 0) renderWatchlist();
 }
 
 /* ------------------ Portfolio loader ------------------ */
@@ -1046,6 +858,189 @@ if (loginForm) {
   }
 })();
 
+/* ------------------ Chart helpers (unchanged) ------------------ */
+function generateStockData(count) {
+  const data = [];
+  let lastClose = 50 + Math.random() * 150;
+  let time = new Date();
+  time.setDate(time.getDate() - count);
+
+  for (let i = 0; i < count; i++) {
+    time.setDate(time.getDate() + 1);
+    const open = lastClose + (Math.random() - 0.5) * 5;
+    const high = Math.max(open, lastClose) + Math.random() * 5;
+    const low = Math.min(open, lastClose) - Math.random() * 5;
+    const close = low + Math.random() * (high - low);
+    lastClose = close;
+
+    data.push({
+      time: time.toISOString().split("T")[0],
+      open: parseFloat(open.toFixed(2)),
+      high: parseFloat(high.toFixed(2)),
+      low: parseFloat(low.toFixed(2)),
+      close: parseFloat(close.toFixed(2)),
+    });
+  }
+  return data;
+}
+
+function renderChart(data, theme, symbol) {
+  const chartContainer = document.getElementById("chart-container");
+  const chartLoader = document.getElementById("chart-loader");
+
+  if (!chartContainer) return;
+
+  if (chartInstance) {
+    chartInstance.remove();
+  }
+
+  chartInstance = LightweightCharts.createChart(chartContainer, {
+    width: chartContainer.clientWidth,
+    height: chartContainer.clientHeight,
+    layout: {
+      backgroundColor: theme === "dark" ? "#1f2937" : "#ffffff",
+      textColor: theme === "dark" ? "#d1d5db" : "#111827",
+    },
+    grid: {
+      vertLines: { color: theme === "dark" ? "#374151" : "#e5e7eb" },
+      horzLines: { color: theme === "dark" ? "#374151" : "#e5e7eb" },
+    },
+    crosshair: {
+      mode: LightweightCharts.CrosshairMode.Normal,
+    },
+    priceScale: {
+      borderColor: theme === "dark" ? "#4b5563" : "#cccccc",
+    },
+    timeScale: {
+      borderColor: theme === "dark" ? "#4b5563" : "#cccccc",
+      timeVisible: true,
+      secondsVisible: false,
+    },
+    watermark: {
+      color: theme === "dark" ? "rgba(209, 213, 219, 0.1)" : "rgba(0, 0, 0, 0.1)",
+      visible: true,
+      text: symbol,
+      fontSize: 48,
+      horzAlign: "center",
+      vertAlign: "center",
+    },
+  });
+
+  const candleSeries = chartInstance.addCandlestickSeries({
+    upColor: theme === "dark" ? "#10b981" : "#22c55e",
+    downColor: theme === "dark" ? "#ef4444" : "#dc2626",
+    borderDownColor: theme === "dark" ? "#ef4444" : "#dc2626",
+    borderUpColor: theme === "dark" ? "#10b981" : "#22c55e",
+    wickDownColor: theme === "dark" ? "#ef4444" : "#dc2626",
+    wickUpColor: theme === "dark" ? "#10b981" : "#22c55e",
+  });
+
+  candleSeries.setData(data);
+  chartInstance.timeScale().fitContent();
+  if (chartLoader) chartLoader.classList.add("hidden");
+
+  window.addEventListener("resize", () => {
+    if (chartInstance && chartContainer.clientWidth > 0 && chartContainer.clientHeight > 0) {
+      chartInstance.resize(chartContainer.clientWidth, chartContainer.clientHeight);
+    }
+  });
+}
+
+/* ------------------ initial chart ------------------ */
+renderChart(generateStockData(100), localStorage.getItem("color-theme") || "light", "TTCO");
+
+/* ------------------ Search / Chart / Details (already defined above usage) ------------------ */
+const searchInput = document.getElementById("stock-search");
+const searchButton = document.getElementById("search-button");
+const stockDetailsDiv = document.getElementById("stock-details");
+const companyNameHeader = document.getElementById("company-name");
+const searchErrorDiv = document.getElementById("search-error");
+const addToWatchlistBtn = document.getElementById("addToWatchlistBtn");
+
+if (searchButton) searchButton.addEventListener("click", performSearch);
+if (searchInput) {
+  searchInput.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") performSearch();
+  });
+}
+
+function performSearch() {
+  const searchTerm = (searchInput?.value || "").toUpperCase().trim();
+  if (searchErrorDiv) searchErrorDiv.classList.add("hidden");
+
+  if (!searchTerm) {
+    displayStockDetails(null);
+    if (chartInstance) {
+      chartInstance.remove();
+      chartInstance = null;
+      const loader = document.getElementById("chart-loader");
+      if (loader) loader.classList.remove("hidden");
+    }
+    if (addToWatchlistBtn) addToWatchlistBtn.disabled = true;
+    return;
+  }
+
+  const stock = dummyStockData[searchTerm];
+  displayStockDetails(stock, searchTerm);
+
+  if (stock) {
+    const loader = document.getElementById("chart-loader");
+    if (loader) loader.classList.remove("hidden");
+    renderChart(generateStockData(100), localStorage.getItem("color-theme") || "light", searchTerm);
+    if (addToWatchlistBtn) {
+      addToWatchlistBtn.disabled = false;
+      const inWL = isStockInWatchlist(searchTerm);
+      addToWatchlistBtn.textContent = inWL ? "Remove from Watchlist" : "Add to Watchlist";
+      addToWatchlistBtn.classList.toggle("bg-red-500", inWL);
+      addToWatchlistBtn.classList.toggle("hover:bg-red-600", inWL);
+      addToWatchlistBtn.classList.toggle("bg-green-500", !inWL);
+      addToWatchlistBtn.classList.toggle("hover:bg-green-600", !inWL);
+    }
+  } else {
+    if (searchErrorDiv) searchErrorDiv.classList.remove("hidden");
+    if (chartInstance) {
+      chartInstance.remove();
+      chartInstance = null;
+      const loader = document.getElementById("chart-loader");
+      if (loader) loader.classList.remove("hidden");
+    }
+    if (addToWatchlistBtn) addToWatchlistBtn.disabled = true;
+  }
+}
+
+function displayStockDetails(stock, symbol = "N/A") {
+  if (stock) {
+    if (companyNameHeader) companyNameHeader.textContent = `${stock.name} (${symbol})`;
+    const changeClass = stock.change && String(stock.change).startsWith("+")
+      ? "text-green-500 dark:text-green-400"
+      : "text-red-500 dark:text-red-400";
+    if (stockDetailsDiv) {
+      stockDetailsDiv.innerHTML = `
+      <div class="flex justify-between items-baseline">
+          <p class="text-3xl font-bold">${Number(stock.price).toFixed(2)} <span class="text-xs text-gray-500 dark:text-gray-400">TC</span></p>
+          <p class="text-lg ${changeClass}">${stock.change} (${stock.changePercent})</p>
+      </div>
+      <hr class="my-2 border-gray-200 dark:border-gray-600">
+      <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+          <p><strong>Open:</strong> ${Number(stock.open).toFixed(2)}</p>
+          <p><strong>High:</strong> ${Number(stock.high).toFixed(2)}</p>
+          <p><strong>Low:</strong> ${Number(stock.low).toFixed(2)}</p>
+          <p><strong>Day High:</strong> ${Number(stock.dayHigh).toFixed(2)}</p>
+          <p><strong>Day Low:</strong> ${Number(stock.dayLow).toFixed(2)}</p>
+      </div>
+      `;
+    }
+  } else {
+    if (companyNameHeader) companyNameHeader.textContent = "Company Overview";
+    if (stockDetailsDiv)
+      stockDetailsDiv.innerHTML = `<p class="text-sm text-gray-600 dark:text-gray-400">Search for a stock to see details.</p>`;
+  }
+}
+
+/* ------------------ Start periodic price updates (only once) ------------------ */
+setInterval(updateStockPrices, 5000);
+updateStockPrices(); // immediate first tick
+
 /* ------------------ Misc init ------------------ */
 const currentYearEl = document.getElementById("currentYear");
 if (currentYearEl) currentYearEl.textContent = new Date().getFullYear();
@@ -1102,5 +1097,3 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 });
-
-
