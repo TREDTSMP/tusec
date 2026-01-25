@@ -99,6 +99,17 @@ function updateStockPrices() {
   }
 }
 
+const logoutBtn = document.getElementById("logoutBtn");
+
+if (logoutBtn) {
+  logoutBtn.addEventListener("click", async () => {
+    await supabase.auth.signOut();
+    currentUser = null;
+    updateAuthUI();
+    alert("Logged out");
+  });
+}
+
 /* ------------------ Auth state ------------------ */
 supabase.auth.onAuthStateChange((_event, session) => {
   currentUser = session?.user || null;
@@ -1196,13 +1207,13 @@ if (loginForm) {
 /* ------------------ Auto-check user at load ------------------ */
 (async () => {
   try {
-    const res = await supabase.auth.getUser();
-    const user = res?.data?.user || null;
-    currentUser = user;
-    updateAuthUI();
+  const { data } = await supabase.auth.getSession();
+currentUser = data?.session?.user || null;
+updateAuthUI();
   } catch (err) {
     console.warn("Unable to auto-fetch user at load:", err);
   }
 })();
+
 
 
