@@ -169,6 +169,15 @@ if (mobileMenuButton && mobileMenu) {
       .forEach((icon) => icon.classList.toggle("hidden"));
   });
 }
+
+/* ------------------ Move BUY/SELL/TRADEQTY refs here so performSearch can safely use them ------------------ */
+const buyBtnEl = document.getElementById("buyBtn");
+const sellBtnEl = document.getElementById("sellBtn");
+const tradeQtyEl = document.getElementById("tradeQty");
+// Ensure they start disabled until a valid stock & login are present
+if (buyBtnEl) buyBtnEl.disabled = true;
+if (sellBtnEl) sellBtnEl.disabled = true;
+
 /* ================== LOG IN-OUT FN ================== */
 function updateAuthUI() {
   const loginBtns = [loginBtnNav, loginBtnMobile];
@@ -939,6 +948,9 @@ function performSearch() {
       if (loader) loader.classList.remove("hidden");
     }
     if (addToWatchlistBtn) addToWatchlistBtn.disabled = true;
+    // disable buy/sell when no search term
+    if (buyBtnEl) buyBtnEl.disabled = true;
+    if (sellBtnEl) sellBtnEl.disabled = true;
     populateNewsFeed();
     return;
   }
@@ -947,6 +959,15 @@ function performSearch() {
   displayStockDetails(stock, searchTerm);
 
   if (stock) {
+    // enable buy/sell only if logged in
+    if (currentUser) {
+      if (buyBtnEl) buyBtnEl.disabled = false;
+      if (sellBtnEl) sellBtnEl.disabled = false;
+    } else {
+      if (buyBtnEl) buyBtnEl.disabled = true;
+      if (sellBtnEl) sellBtnEl.disabled = true;
+    }
+
     const loader = document.getElementById("chart-loader");
     if (loader) loader.classList.remove("hidden");
 
@@ -972,6 +993,8 @@ function performSearch() {
       if (loader) loader.classList.remove("hidden");
     }
     if (addToWatchlistBtn) addToWatchlistBtn.disabled = true;
+    if (buyBtnEl) buyBtnEl.disabled = true;
+    if (sellBtnEl) sellBtnEl.disabled = true;
   }
 
   // update news for the selected symbol (or default)
@@ -1118,9 +1141,6 @@ async function sellStock(symbol, quantity) {
 }
 
 /* ------------------ Single BUY/SELL listeners (only once) ------------------ */
-const buyBtnEl = document.getElementById("buyBtn");
-const sellBtnEl = document.getElementById("sellBtn");
-
 if (buyBtnEl) {
   buyBtnEl.addEventListener("click", () => {
     if (!currentUser) {
@@ -1128,8 +1148,11 @@ if (buyBtnEl) {
       return;
     }
     const symbol = (searchInput?.value || "").toUpperCase().trim();
-    const qty = Number(document.getElementById("tradeQty")?.value || prompt(`Buy how many shares of ${symbol}?`));
-    if (!symbol || !qty || qty <= 0) return;
+    const qty = Number(tradeQtyEl?.value || 0);
+    if (!symbol || !qty || qty <= 0) {
+      alert("Please select a valid stock and enter a valid quantity to buy.");
+      return;
+    }
     buyStock(symbol, qty);
   });
 }
@@ -1141,8 +1164,11 @@ if (sellBtnEl) {
       return;
     }
     const symbol = (searchInput?.value || "").toUpperCase().trim();
-    const qty = Number(document.getElementById("tradeQty")?.value || prompt(`Sell how many shares of ${symbol}?`));
-    if (!symbol || !qty || qty <= 0) return;
+    const qty = Number(tradeQtyEl?.value || 0);
+    if (!symbol || !qty || qty <= 0) {
+      alert("Please select a valid stock and enter a valid quantity to sell.");
+      return;
+    }
     sellStock(symbol, qty);
   });
 }
@@ -1214,6 +1240,4 @@ updateAuthUI();
     console.warn("Unable to auto-fetch user at load:", err);
   }
 })();
-
-
 
