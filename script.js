@@ -93,10 +93,6 @@ function updateStockPrices() {
   }
 }
 
-// Run every 5 seconds
-// Note: the setInterval is placed AFTER dummyStockData is built (later in file).
-// setInterval(updateStockPrices, 5000);  <-- this will be called once after dummyStockData is created
-
 /* ------------------ Auth state ------------------ */
 supabase.auth.onAuthStateChange((_event, session) => {
   currentUser = session?.user || null;
@@ -488,7 +484,7 @@ function populateMarketMovers() {
       ? gainers
           .map(
             (stock) => `
-                <li class="flex justify-between items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors duration-150 cursor-pointer" onclick="searchInput.value='${stock.symbol}'; performSearch(); document.getElementById('stock-search').scrollIntoView({ behavior: 'smooth' });">
+                <li class="flex justify-between items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors duration-150 cursor-pointer" data-symbol="${stock.symbol}">
                 <div>
                 <span class="font-semibold text-gray-800 dark:text-gray-200">${stock.symbol}</span>
                 <span class="text-xs text-gray-500 dark:text-gray-400 block">${stock.name.substring(0, 20)}${stock.name.length > 20 ? "..." : ""}</span>
@@ -509,7 +505,7 @@ function populateMarketMovers() {
       ? losers
           .map(
             (stock) => `
-            <li class="flex justify-between items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors duration-150 cursor-pointer" onclick="searchInput.value='${stock.symbol}'; performSearch(); document.getElementById('stock-search').scrollIntoView({ behavior: 'smooth' });">
+            <li class="flex justify-between items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors duration-150 cursor-pointer" data-symbol="${stock.symbol}">
                 <div>
                     <span class="font-semibold text-gray-800 dark:text-gray-200">${stock.symbol}</span>
                     <span class="text-xs text-gray-500 dark:text-gray-400 block">${stock.name.substring(0, 20)}${stock.name.length > 20 ? "..." : ""}</span>
@@ -527,6 +523,32 @@ function populateMarketMovers() {
 }
 populateMarketMovers();
 setInterval(populateMarketMovers, 15000);
+
+/* ------------------ Market movers click delegation ------------------ */
+if (topGainersList) {
+  topGainersList.addEventListener("click", (e) => {
+    const li = e.target.closest("li[data-symbol]");
+    if (!li) return;
+    const sym = li.getAttribute("data-symbol");
+    if (!sym) return;
+    const inputEl = document.getElementById("stock-search");
+    if (inputEl) inputEl.value = sym;
+    performSearch();
+    document.getElementById("stock-search")?.scrollIntoView({ behavior: "smooth" });
+  });
+}
+if (topLosersList) {
+  topLosersList.addEventListener("click", (e) => {
+    const li = e.target.closest("li[data-symbol]");
+    if (!li) return;
+    const sym = li.getAttribute("data-symbol");
+    if (!sym) return;
+    const inputEl = document.getElementById("stock-search");
+    if (inputEl) inputEl.value = sym;
+    performSearch();
+    document.getElementById("stock-search")?.scrollIntoView({ behavior: "smooth" });
+  });
+}
 
 /* ------------------ Watchlist & Portfolio ------------------ */
 const watchlistItemsDiv = document.getElementById("watchlist-items");
@@ -549,14 +571,14 @@ function renderWatchlist() {
         ? "text-green-500 dark:text-green-400"
         : "text-red-500 dark:text-red-400";
       return `
-      <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg shadow hover:shadow-md transition-all duration-200 cursor-pointer" onclick="searchInput.value='${symbol}'; performSearch(); document.getElementById('stock-search').scrollIntoView({ behavior: 'smooth' });">
+      <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg shadow hover:shadow-md transition-all duration-200 cursor-pointer watchlist-item" data-symbol="${symbol}">
       <div class="flex justify-between items-start mb-2">
           <div>
               <h4 class="text-lg font-semibold text-gray-800 dark:text-gray-100">${symbol}</h4>
               <p class="text-xs text-gray-500 dark:text-gray-400">${stock.name}</p>
           </div>
-           <button class="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-xs p-1" onclick="event.stopPropagation(); toggleWatchlist('${symbol}');" title="Remove from watchlist">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+           <button type="button" class="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-xs p-1 remove-from-watchlist" data-action="remove" data-symbol="${symbol}" title="Remove from watchlist" aria-label="Remove ${symbol} from watchlist">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
               </svg>
           </button>
@@ -602,6 +624,30 @@ function toggleWatchlist(symbol) {
     addToWatchlistBtn.classList.toggle("bg-green-500", !inWL);
     addToWatchlistBtn.classList.toggle("hover:bg-green-600", !inWL);
   }
+}
+
+/* ------------------ Watchlist interaction delegation ------------------ */
+if (watchlistItemsDiv) {
+  watchlistItemsDiv.addEventListener("click", (e) => {
+    const removeBtn = e.target.closest('[data-action="remove"]');
+    if (removeBtn) {
+      e.stopPropagation();
+      const symbol = removeBtn.getAttribute("data-symbol");
+      if (symbol) toggleWatchlist(symbol);
+      return;
+    }
+
+    const parentItem = e.target.closest("[data-symbol]");
+    if (parentItem) {
+      const sym = parentItem.getAttribute("data-symbol");
+      if (sym) {
+        const inputEl = document.getElementById("stock-search");
+        if (inputEl) inputEl.value = sym;
+        performSearch();
+        document.getElementById("stock-search")?.scrollIntoView({ behavior: "smooth" });
+      }
+    }
+  });
 }
 
 if (addToWatchlistBtn) {
@@ -651,7 +697,7 @@ async function loadPortfolio() {
   });
 }
 
-/* ------------------ News feed (unchanged) ------------------ */
+/* ------------------ News feed (unchanged logic but wiring adjusted) ------------------ */
 const newsFeedDiv = document.getElementById("news-feed");
 function populateNewsFeed() {
   const currentSymbol = (searchInput?.value || "").toUpperCase().trim();
@@ -684,35 +730,161 @@ function populateNewsFeed() {
     : '<p class="text-sm text-gray-500 dark:text-gray-400">No news available at the moment.</p>';
 }
 
-if (searchButton) searchButton.addEventListener("click", populateNewsFeed);
+/* ------------------ Search / Chart / Details (already defined above usage) ------------------ */
+const searchInput = document.getElementById("stock-search");
+const searchButton = document.getElementById("search-button");
+const stockDetailsDiv = document.getElementById("stock-details");
+const companyNameHeader = document.getElementById("company-name");
+const searchErrorDiv = document.getElementById("search-error");
+const addToWatchlistBtn = document.getElementById("addToWatchlistBtn");
+
+/* Ensure only performSearch is attached for search actions; performSearch will call populateNewsFeed */
+if (searchButton) searchButton.addEventListener("click", performSearch);
 if (searchInput) {
   searchInput.addEventListener("keypress", (e) => {
-    if (e.key === "Enter") populateNewsFeed();
+    if (e.key === "Enter") performSearch();
   });
 }
 
-/* ------------------ Auth UI ------------------ */
-function updateAuthUI() {
-  const buyBtn = document.getElementById("buyBtn");
-  const sellBtn = document.getElementById("sellBtn");
-  const loginBtnNavLocal = document.getElementById("loginBtnNav");
-  const loginBtnMobileLocal = document.getElementById("loginBtnMobile");
+function performSearch() {
+  const searchTerm = (searchInput?.value || "").toUpperCase().trim();
+  if (searchErrorDiv) searchErrorDiv.classList.add("hidden");
 
-  if (buyBtn) buyBtn.disabled = !currentUser;
-  if (sellBtn) sellBtn.disabled = !currentUser;
+  if (!searchTerm) {
+    displayStockDetails(null);
+    if (chartInstance) {
+      chartInstance.remove();
+      chartInstance = null;
+      const loader = document.getElementById("chart-loader");
+      if (loader) loader.classList.remove("hidden");
+    }
+    if (addToWatchlistBtn) addToWatchlistBtn.disabled = true;
+    populateNewsFeed();
+    return;
+  }
 
-  if (loginBtnNavLocal) loginBtnNavLocal.textContent = currentUser ? "Dashboard" : "Login";
-  if (loginBtnMobileLocal) loginBtnMobileLocal.textContent = currentUser ? "Dashboard" : "Login";
+  const stock = dummyStockData[searchTerm];
+  displayStockDetails(stock, searchTerm);
 
-  // show/hide tc balance and load balances/portfolio if logged in
-  const tcEl = document.getElementById("tcBalance");
-  if (tcEl) tcEl.style.display = currentUser ? "inline-block" : "none";
+  if (stock) {
+    const loader = document.getElementById("chart-loader");
+    if (loader) loader.classList.remove("hidden");
+    renderChart(generateStockData(100), localStorage.getItem("color-theme") || "light", searchTerm);
+    if (addToWatchlistBtn) {
+      addToWatchlistBtn.disabled = false;
+      const inWL = isStockInWatchlist(searchTerm);
+      addToWatchlistBtn.textContent = inWL ? "Remove from Watchlist" : "Add to Watchlist";
+      addToWatchlistBtn.classList.toggle("bg-red-500", inWL);
+      addToWatchlistBtn.classList.toggle("hover:bg-red-600", inWL);
+      addToWatchlistBtn.classList.toggle("bg-green-500", !inWL);
+      addToWatchlistBtn.classList.toggle("hover:bg-green-600", !inWL);
+    }
+  } else {
+    if (searchErrorDiv) searchErrorDiv.classList.remove("hidden");
+    if (chartInstance) {
+      chartInstance.remove();
+      chartInstance = null;
+      const loader = document.getElementById("chart-loader");
+      if (loader) loader.classList.remove("hidden");
+    }
+    if (addToWatchlistBtn) addToWatchlistBtn.disabled = true;
+  }
 
-  if (currentUser) {
-    loadBalance();
-    loadPortfolio();
+  // update news for the selected symbol (or default)
+  populateNewsFeed();
+}
+
+function displayStockDetails(stock, symbol = "N/A") {
+  if (stock) {
+    if (companyNameHeader) companyNameHeader.textContent = `${stock.name} (${symbol})`;
+    const changeClass = stock.change && String(stock.change).startsWith("+")
+      ? "text-green-500 dark:text-green-400"
+      : "text-red-500 dark:text-red-400";
+    if (stockDetailsDiv) {
+      stockDetailsDiv.innerHTML = `
+      <div class="flex justify-between items-baseline">
+          <p class="text-3xl font-bold">${Number(stock.price).toFixed(2)} <span class="text-xs text-gray-500 dark:text-gray-400">TC</span></p>
+          <p class="text-lg ${changeClass}">${stock.change} (${stock.changePercent})</p>
+      </div>
+      <hr class="my-2 border-gray-200 dark:border-gray-600">
+      <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+          <p><strong>Open:</strong> ${Number(stock.open).toFixed(2)}</p>
+          <p><strong>High:</strong> ${Number(stock.high).toFixed(2)}</p>
+          <p><strong>Low:</strong> ${Number(stock.low).toFixed(2)}</p>
+          <p><strong>Day High:</strong> ${Number(stock.dayHigh).toFixed(2)}</p>
+          <p><strong>Day Low:</strong> ${Number(stock.dayLow).toFixed(2)}</p>
+      </div>
+      `;
+    }
+  } else {
+    if (companyNameHeader) companyNameHeader.textContent = "Company Overview";
+    if (stockDetailsDiv)
+      stockDetailsDiv.innerHTML = `<p class="text-sm text-gray-600 dark:text-gray-400">Search for a stock to see details.</p>`;
   }
 }
+
+/* ------------------ Start periodic price updates (only once) ------------------ */
+setInterval(updateStockPrices, 5000);
+updateStockPrices(); // immediate first tick
+
+/* ------------------ Misc init ------------------ */
+const currentYearEl = document.getElementById("currentYear");
+if (currentYearEl) currentYearEl.textContent = new Date().getFullYear();
+
+document.addEventListener("DOMContentLoaded", () => {
+  renderWatchlist();
+  populateNewsFeed();
+  displayStockDetails(null);
+  if (!searchInput?.value) {
+    if (searchInput) searchInput.value = "TTCO";
+    performSearch();
+  }
+
+  // market status UI (optional element)
+  function updateMarketStatusUI() {
+    const el = document.getElementById("marketStatus");
+    if (!el) return;
+
+    if (isMarketOpen()) {
+      el.textContent = "Market Open";
+      el.className = "text-green-500 font-semibold";
+    } else {
+      el.textContent = "Market Closed";
+      el.className = "text-red-500 font-semibold";
+    }
+  }
+
+  setInterval(updateMarketStatusUI, 60000);
+  updateMarketStatusUI();
+
+  document.querySelectorAll('nav a[href^="#"]').forEach((anchor) => {
+    anchor.addEventListener("click", function (e) {
+      e.preventDefault();
+      const targetId = this.getAttribute("href");
+      const targetElement = document.querySelector(targetId);
+      if (targetElement) {
+        const navbarHeight = document.querySelector("nav")?.offsetHeight || 0;
+        const tickerHeight = document.querySelector(".ticker-wrap")?.offsetHeight || 0;
+        const offsetPosition = targetElement.offsetTop - navbarHeight - tickerHeight - 20;
+
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: "smooth",
+        });
+
+        if (mobileMenu && !mobileMenu.classList.contains("hidden")) {
+          mobileMenu.classList.add("hidden");
+          if (mobileMenuButton) mobileMenuButton.setAttribute("aria-expanded", "false");
+          if (mobileMenuButton) {
+            mobileMenuButton
+              .querySelectorAll("svg")
+              .forEach((icon) => icon.classList.toggle("hidden"));
+          }
+        }
+      }
+    });
+  });
+});
 
 /* ------------------ RPC-based buy/sell (atomic) ------------------ */
 async function buyStock(symbol, quantity) {
@@ -948,152 +1120,3 @@ function renderChart(data, theme, symbol) {
 
 /* ------------------ initial chart ------------------ */
 renderChart(generateStockData(100), localStorage.getItem("color-theme") || "light", "TTCO");
-
-/* ------------------ Search / Chart / Details (already defined above usage) ------------------ */
-const searchInput = document.getElementById("stock-search");
-const searchButton = document.getElementById("search-button");
-const stockDetailsDiv = document.getElementById("stock-details");
-const companyNameHeader = document.getElementById("company-name");
-const searchErrorDiv = document.getElementById("search-error");
-const addToWatchlistBtn = document.getElementById("addToWatchlistBtn");
-
-if (searchButton) searchButton.addEventListener("click", performSearch);
-if (searchInput) {
-  searchInput.addEventListener("keypress", (e) => {
-    if (e.key === "Enter") performSearch();
-  });
-}
-
-function performSearch() {
-  const searchTerm = (searchInput?.value || "").toUpperCase().trim();
-  if (searchErrorDiv) searchErrorDiv.classList.add("hidden");
-
-  if (!searchTerm) {
-    displayStockDetails(null);
-    if (chartInstance) {
-      chartInstance.remove();
-      chartInstance = null;
-      const loader = document.getElementById("chart-loader");
-      if (loader) loader.classList.remove("hidden");
-    }
-    if (addToWatchlistBtn) addToWatchlistBtn.disabled = true;
-    return;
-  }
-
-  const stock = dummyStockData[searchTerm];
-  displayStockDetails(stock, searchTerm);
-
-  if (stock) {
-    const loader = document.getElementById("chart-loader");
-    if (loader) loader.classList.remove("hidden");
-    renderChart(generateStockData(100), localStorage.getItem("color-theme") || "light", searchTerm);
-    if (addToWatchlistBtn) {
-      addToWatchlistBtn.disabled = false;
-      const inWL = isStockInWatchlist(searchTerm);
-      addToWatchlistBtn.textContent = inWL ? "Remove from Watchlist" : "Add to Watchlist";
-      addToWatchlistBtn.classList.toggle("bg-red-500", inWL);
-      addToWatchlistBtn.classList.toggle("hover:bg-red-600", inWL);
-      addToWatchlistBtn.classList.toggle("bg-green-500", !inWL);
-      addToWatchlistBtn.classList.toggle("hover:bg-green-600", !inWL);
-    }
-  } else {
-    if (searchErrorDiv) searchErrorDiv.classList.remove("hidden");
-    if (chartInstance) {
-      chartInstance.remove();
-      chartInstance = null;
-      const loader = document.getElementById("chart-loader");
-      if (loader) loader.classList.remove("hidden");
-    }
-    if (addToWatchlistBtn) addToWatchlistBtn.disabled = true;
-  }
-}
-
-function displayStockDetails(stock, symbol = "N/A") {
-  if (stock) {
-    if (companyNameHeader) companyNameHeader.textContent = `${stock.name} (${symbol})`;
-    const changeClass = stock.change && String(stock.change).startsWith("+")
-      ? "text-green-500 dark:text-green-400"
-      : "text-red-500 dark:text-red-400";
-    if (stockDetailsDiv) {
-      stockDetailsDiv.innerHTML = `
-      <div class="flex justify-between items-baseline">
-          <p class="text-3xl font-bold">${Number(stock.price).toFixed(2)} <span class="text-xs text-gray-500 dark:text-gray-400">TC</span></p>
-          <p class="text-lg ${changeClass}">${stock.change} (${stock.changePercent})</p>
-      </div>
-      <hr class="my-2 border-gray-200 dark:border-gray-600">
-      <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-          <p><strong>Open:</strong> ${Number(stock.open).toFixed(2)}</p>
-          <p><strong>High:</strong> ${Number(stock.high).toFixed(2)}</p>
-          <p><strong>Low:</strong> ${Number(stock.low).toFixed(2)}</p>
-          <p><strong>Day High:</strong> ${Number(stock.dayHigh).toFixed(2)}</p>
-          <p><strong>Day Low:</strong> ${Number(stock.dayLow).toFixed(2)}</p>
-      </div>
-      `;
-    }
-  } else {
-    if (companyNameHeader) companyNameHeader.textContent = "Company Overview";
-    if (stockDetailsDiv)
-      stockDetailsDiv.innerHTML = `<p class="text-sm text-gray-600 dark:text-gray-400">Search for a stock to see details.</p>`;
-  }
-}
-
-/* ------------------ Start periodic price updates (only once) ------------------ */
-setInterval(updateStockPrices, 5000);
-updateStockPrices(); // immediate first tick
-
-/* ------------------ Misc init ------------------ */
-const currentYearEl = document.getElementById("currentYear");
-if (currentYearEl) currentYearEl.textContent = new Date().getFullYear();
-
-document.addEventListener("DOMContentLoaded", () => {
-  renderWatchlist();
-  populateNewsFeed();
-  displayStockDetails(null);
-  if (!searchInput?.value) {
-    if (searchInput) searchInput.value = "TTCO";
-    performSearch();
-  }
-
-  // market status UI (optional element)
-  function updateMarketStatusUI() {
-    const el = document.getElementById("marketStatus");
-    if (!el) return;
-
-    if (isMarketOpen()) {
-      el.textContent = "Market Open";
-      el.className = "text-green-500 font-semibold";
-    } else {
-      el.textContent = "Market Closed";
-      el.className = "text-red-500 font-semibold";
-    }
-  }
-
-  setInterval(updateMarketStatusUI, 60000);
-  updateMarketStatusUI();
-
-  document.querySelectorAll('nav a[href^="#"]').forEach((anchor) => {
-    anchor.addEventListener("click", function (e) {
-      e.preventDefault();
-      const targetId = this.getAttribute("href");
-      const targetElement = document.querySelector(targetId);
-      if (targetElement) {
-        const navbarHeight = document.querySelector("nav")?.offsetHeight || 0;
-        const tickerHeight = document.querySelector(".ticker-wrap")?.offsetHeight || 0;
-        const offsetPosition = targetElement.offsetTop - navbarHeight - tickerHeight - 20;
-
-        window.scrollTo({
-          top: offsetPosition,
-          behavior: "smooth",
-        });
-
-        if (!mobileMenu.classList.contains("hidden")) {
-          mobileMenu.classList.add("hidden");
-          mobileMenuButton.setAttribute("aria-expanded", "false");
-          mobileMenuButton
-            .querySelectorAll("svg")
-            .forEach((icon) => icon.classList.toggle("hidden"));
-        }
-      }
-    });
-  });
-});
