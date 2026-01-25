@@ -27,6 +27,9 @@ async function loadBalance() {
   }
 }
 
+/* ------------------ Config: let market updates run even off-hours (for dev/testing) ------------------ */
+const MARKET_ALWAYS_OPEN = true; // set false if you want to respect isMarketOpen()
+
 /* ------------------ PRICE ENGINE (5s TICK) ------------------ */
 /* Single authoritative engine that updates all prices every 5s. */
 
@@ -34,9 +37,8 @@ const MAX_PRICE = 200000; // single definition
 const MIN_PRICE = 0;
 
 function updateStockPrices() {
-  // Respect market hours
-  if (!isMarketOpen()) {
-    // update UI to show market closed but do not change prices
+  // Respect market hours unless overridden by config
+  if (!MARKET_ALWAYS_OPEN && !isMarketOpen()) {
     populateMarketMovers();
     populateTicker();
     renderWatchlistIfNeeded();
@@ -52,13 +54,14 @@ function updateStockPrices() {
     const magnitude = Math.random() * 0.02 + 0.005; // 0.5%–2.5%
     let newPrice = oldPrice + oldPrice * magnitude * direction;
 
-    // If price goes negative, clamp
-    if (!isFinite(newPrice) || newPrice <= 0) newPrice = Math.max(0.01, oldPrice * (1 + (Math.random() - 0.5) * 0.01));
+    // If price goes negative or NaN, clamp
+    if (!isFinite(newPrice) || newPrice <= 0) {
+      newPrice = Math.max(0.01, Math.abs(oldPrice) || 1 * (1 + (Math.random() - 0.5) * 0.01));
+    }
 
     // MAX ceiling behaviour - gently push price back toward initial if it breaches the ceiling
     if (newPrice >= MAX_PRICE) {
       const diff = newPrice - (stock.initial || oldPrice);
-      // gentle cooldown
       const cooldown = Math.min(Math.max(50, diff * 0.08), diff || 50);
       newPrice = Math.max(MIN_PRICE + 0.01, newPrice - cooldown);
     }
@@ -67,12 +70,13 @@ function updateStockPrices() {
     if (newPrice > MAX_PRICE) newPrice = MAX_PRICE;
     if (newPrice < MIN_PRICE) newPrice = MIN_PRICE;
 
-    const change = newPrice - oldPrice;
-    const changePercent = oldPrice > 0 ? (change / oldPrice) * 100 : 0;
+    // Update price and compute change relative to OPEN (so that gainers/losers are meaningful)
+    const changeFromOpen = newPrice - (stock.open || newPrice);
+    const changePercentFromOpen = (stock.open && stock.open > 0) ? (changeFromOpen / stock.open) * 100 : 0;
 
     stock.price = Number(newPrice.toFixed(2));
-    stock.change = `${change >= 0 ? "+" : ""}${change.toFixed(2)}`;
-    stock.changePercent = `${changePercent >= 0 ? "+" : ""}${changePercent.toFixed(2)}%`;
+    stock.change = `${changeFromOpen >= 0 ? "+" : ""}${changeFromOpen.toFixed(2)}`;
+    stock.changePercent = `${changePercentFromOpen >= 0 ? "+" : ""}${changePercentFromOpen.toFixed(2)}%`;
 
     // update intraday extremes
     stock.high = Math.max(Number(stock.high || stock.price), stock.price);
@@ -86,10 +90,12 @@ function updateStockPrices() {
   populateTicker();
   renderWatchlist();
 
-  // If a symbol is currently selected in the search input, refresh its details
+  // If a symbol is currently selected in the search input, refresh its details and the chart
   const currentSymbol = (searchInput?.value || "").toUpperCase().trim();
   if (currentSymbol && dummyStockData[currentSymbol]) {
     displayStockDetails(dummyStockData[currentSymbol], currentSymbol);
+    // update chart for the selected symbol so it reflects latest price
+    updateChartForSymbol(currentSymbol);
   }
 }
 
@@ -104,6 +110,7 @@ const themeToggleBtn = document.getElementById("theme-toggle");
 const themeToggleDarkIcon = document.getElementById("theme-toggle-dark-icon");
 const themeToggleLightIcon = document.getElementById("theme-toggle-light-icon");
 let chartInstance = null;
+let lastCandleSeries = null; // keep reference to current candlestick series
 
 if (
   localStorage.getItem("color-theme") === "dark" ||
@@ -126,10 +133,10 @@ if (themeToggleBtn) {
       ? "dark"
       : "light";
     localStorage.setItem("color-theme", currentTheme);
-    if (chartInstance) {
-      const symbol =
-        document.getElementById("stock-search").value.toUpperCase() || "TTCO";
-      renderChart(generateStockData(100), currentTheme, symbol);
+    // re-render current chart in the new theme
+    const symbol = (document.getElementById("stock-search")?.value || "TTCO").toUpperCase();
+    if (symbol && dummyStockData[symbol]) {
+      renderChart(generateStockData(100, symbol), currentTheme, symbol);
     }
   });
 }
@@ -169,26 +176,30 @@ const closePriceAlertModalBtn = document.getElementById("closePriceAlertModal");
 
 function openModal(modal) {
   if (!modal) return;
+  modal.classList.remove("hidden");
   modal.classList.add("active");
   setTimeout(() => {
-    const inner = modal.querySelector('div[class*="bg-white"]');
+    const inner = modal.querySelector('div[class*="bg-white"], div[class*="bg-gray-800"]');
     if (inner) {
       inner.classList.remove("scale-95", "opacity-0");
       inner.classList.add("scale-100", "opacity-100");
     }
   }, 10);
+  modal.setAttribute("aria-hidden", "false");
   document.body.style.overflow = "hidden";
 }
 
 function closeModal(modal) {
   if (!modal) return;
-  const inner = modal.querySelector('div[class*="bg-white"]');
+  const inner = modal.querySelector('div[class*="bg-white"], div[class*="bg-gray-800"]');
   if (inner) {
     inner.classList.remove("scale-100", "opacity-100");
     inner.classList.add("scale-95", "opacity-0");
   }
   setTimeout(() => {
+    modal.classList.add("hidden");
     modal.classList.remove("active");
+    modal.setAttribute("aria-hidden", "true");
     document.body.style.overflow = "auto";
   }, 300);
 }
@@ -465,12 +476,14 @@ function populateMarketMovers() {
     ...data,
   }));
 
+  // compute numeric percent change from open
   stocksArray.forEach((stock) => {
     stock.numericChangePercent = parseFloat(
       String(stock.changePercent || "0").replace("+", "").replace("%", "")
-    );
+    ) || 0;
   });
 
+  // sort by percent change descending
   stocksArray.sort((a, b) => b.numericChangePercent - a.numericChangePercent);
 
   const gainers = stocksArray.filter((s) => s.numericChangePercent > 0).slice(0, 5);
@@ -650,6 +663,7 @@ if (watchlistItemsDiv) {
   });
 }
 
+const addToWatchlistBtn = document.getElementById("addToWatchlistBtn");
 if (addToWatchlistBtn) {
   addToWatchlistBtn.addEventListener("click", () => {
     const symbol = (searchInput?.value || "").toUpperCase().trim();
@@ -736,7 +750,6 @@ const searchButton = document.getElementById("search-button");
 const stockDetailsDiv = document.getElementById("stock-details");
 const companyNameHeader = document.getElementById("company-name");
 const searchErrorDiv = document.getElementById("search-error");
-const addToWatchlistBtn = document.getElementById("addToWatchlistBtn");
 
 /* Ensure only performSearch is attached for search actions; performSearch will call populateNewsFeed */
 if (searchButton) searchButton.addEventListener("click", performSearch);
@@ -746,6 +759,139 @@ if (searchInput) {
   });
 }
 
+/* ------------------ Chart helpers (updated to reflect symbol price) ------------------ */
+function generateStockData(count, symbol) {
+  // If symbol provided and exists, use its current price as the last close to build plausible historical series
+  let lastClose;
+  if (symbol && dummyStockData[symbol]) {
+    lastClose = Number(dummyStockData[symbol].price) || 50;
+  } else {
+    lastClose = 50 + Math.random() * 150;
+  }
+
+  const data = [];
+  let time = new Date();
+  time.setDate(time.getDate() - count);
+
+  // Generate a pseudo-random walk anchored at lastClose
+  let running = lastClose;
+  for (let i = 0; i < count; i++) {
+    time.setDate(time.getDate() + 1);
+
+    // small random daily moves around running price
+    const dailyVol = Math.max(0.002, Math.random() * 0.02); // 0.2% - 2%
+    const drift = (Math.random() - 0.5) * dailyVol * running;
+    const open = running + drift;
+    const high = open + Math.abs((Math.random()) * running * dailyVol * 1.5);
+    const low = open - Math.abs((Math.random()) * running * dailyVol * 1.5);
+    const close = low + Math.random() * (high - low);
+
+    // Avoid degenerate values
+    running = Math.max(0.01, close);
+
+    data.push({
+      time: time.toISOString().split("T")[0],
+      open: Number(open.toFixed(2)),
+      high: Number(high.toFixed(2)),
+      low: Number(low.toFixed(2)),
+      close: Number(close.toFixed(2)),
+    });
+  }
+
+  // Overwrite the latest candle to reflect the current live price (if symbol provided)
+  if (symbol && dummyStockData[symbol]) {
+    const curPrice = Number(dummyStockData[symbol].price);
+    if (data.length > 0) {
+      const last = data[data.length - 1];
+      last.close = Number(curPrice.toFixed(2));
+      last.high = Math.max(last.high, last.close);
+      last.low = Math.min(last.low, last.close);
+    }
+  }
+
+  return data;
+}
+
+// Single resize listener to avoid duplicates
+function handleResize() {
+  const chartContainer = document.getElementById("chart-container");
+  if (chartInstance && chartContainer && chartContainer.clientWidth > 0 && chartContainer.clientHeight > 0) {
+    chartInstance.resize(chartContainer.clientWidth, chartContainer.clientHeight);
+  }
+}
+window.addEventListener("resize", handleResize);
+
+function renderChart(data, theme, symbol) {
+  const chartContainer = document.getElementById("chart-container");
+  const chartLoader = document.getElementById("chart-loader");
+  if (!chartContainer) return;
+
+  // Remove previous instance if exists
+  if (chartInstance) {
+    try {
+      chartInstance.remove();
+    } catch (err) {
+      // ignore
+    }
+    chartInstance = null;
+    lastCandleSeries = null;
+  }
+
+  chartInstance = LightweightCharts.createChart(chartContainer, {
+    width: chartContainer.clientWidth,
+    height: chartContainer.clientHeight,
+    layout: {
+      backgroundColor: theme === "dark" ? "#1f2937" : "#ffffff",
+      textColor: theme === "dark" ? "#d1d5db" : "#111827",
+    },
+    grid: {
+      vertLines: { color: theme === "dark" ? "#374151" : "#e5e7eb" },
+      horzLines: { color: theme === "dark" ? "#374151" : "#e5e7eb" },
+    },
+    crosshair: {
+      mode: LightweightCharts.CrosshairMode.Normal,
+    },
+    priceScale: {
+      borderColor: theme === "dark" ? "#4b5563" : "#cccccc",
+    },
+    timeScale: {
+      borderColor: theme === "dark" ? "#4b5563" : "#cccccc",
+      timeVisible: true,
+      secondsVisible: false,
+    },
+    watermark: {
+      color: theme === "dark" ? "rgba(209, 213, 219, 0.08)" : "rgba(0, 0, 0, 0.04)",
+      visible: true,
+      text: symbol || "",
+      fontSize: 36,
+      horzAlign: "center",
+      vertAlign: "center",
+    },
+  });
+
+  lastCandleSeries = chartInstance.addCandlestickSeries({
+    upColor: theme === "dark" ? "#10b981" : "#22c55e",
+    downColor: theme === "dark" ? "#ef4444" : "#dc2626",
+    borderDownColor: theme === "dark" ? "#ef4444" : "#dc2626",
+    borderUpColor: theme === "dark" ? "#10b981" : "#22c55e",
+    wickDownColor: theme === "dark" ? "#ef4444" : "#dc2626",
+    wickUpColor: theme === "dark" ? "#10b981" : "#22c55e",
+  });
+
+  lastCandleSeries.setData(data);
+  chartInstance.timeScale().fitContent();
+  if (chartLoader) chartLoader.classList.add("hidden");
+}
+
+/* Helper used by updateStockPrices to re-render chart for selected symbol */
+function updateChartForSymbol(symbol) {
+  if (!symbol || !dummyStockData[symbol]) return;
+  const theme = localStorage.getItem("color-theme") || (document.documentElement.classList.contains("dark") ? "dark" : "light");
+  const data = generateStockData(100, symbol);
+  renderChart(data, theme, symbol);
+}
+
+/* ------------------ Search + UI binding ------------------ */
 function performSearch() {
   const searchTerm = (searchInput?.value || "").toUpperCase().trim();
   if (searchErrorDiv) searchErrorDiv.classList.add("hidden");
@@ -753,8 +899,9 @@ function performSearch() {
   if (!searchTerm) {
     displayStockDetails(null);
     if (chartInstance) {
-      chartInstance.remove();
+      try { chartInstance.remove(); } catch (e) {}
       chartInstance = null;
+      lastCandleSeries = null;
       const loader = document.getElementById("chart-loader");
       if (loader) loader.classList.remove("hidden");
     }
@@ -769,7 +916,10 @@ function performSearch() {
   if (stock) {
     const loader = document.getElementById("chart-loader");
     if (loader) loader.classList.remove("hidden");
-    renderChart(generateStockData(100), localStorage.getItem("color-theme") || "light", searchTerm);
+
+    // Render chart that is consistent with symbol's current price
+    updateChartForSymbol(searchTerm);
+
     if (addToWatchlistBtn) {
       addToWatchlistBtn.disabled = false;
       const inWL = isStockInWatchlist(searchTerm);
@@ -782,8 +932,9 @@ function performSearch() {
   } else {
     if (searchErrorDiv) searchErrorDiv.classList.remove("hidden");
     if (chartInstance) {
-      chartInstance.remove();
+      try { chartInstance.remove(); } catch (e) {}
       chartInstance = null;
+      lastCandleSeries = null;
       const loader = document.getElementById("chart-loader");
       if (loader) loader.classList.remove("hidden");
     }
@@ -835,17 +986,19 @@ document.addEventListener("DOMContentLoaded", () => {
   renderWatchlist();
   populateNewsFeed();
   displayStockDetails(null);
+
+  // if no existing search value, default to TTCO and load it
   if (!searchInput?.value) {
     if (searchInput) searchInput.value = "TTCO";
-    performSearch();
   }
+  performSearch();
 
   // market status UI (optional element)
   function updateMarketStatusUI() {
     const el = document.getElementById("marketStatus");
     if (!el) return;
 
-    if (isMarketOpen()) {
+    if (MARKET_ALWAYS_OPEN || isMarketOpen()) {
       el.textContent = "Market Open";
       el.className = "text-green-500 font-semibold";
     } else {
@@ -942,7 +1095,7 @@ if (buyBtnEl) {
       return;
     }
     const symbol = (searchInput?.value || "").toUpperCase().trim();
-    const qty = Number(prompt(`Buy how many shares of ${symbol}?`));
+    const qty = Number(document.getElementById("tradeQty")?.value || prompt(`Buy how many shares of ${symbol}?`));
     if (!symbol || !qty || qty <= 0) return;
     buyStock(symbol, qty);
   });
@@ -955,7 +1108,7 @@ if (sellBtnEl) {
       return;
     }
     const symbol = (searchInput?.value || "").toUpperCase().trim();
-    const qty = Number(prompt(`Sell how many shares of ${symbol}?`));
+    const qty = Number(document.getElementById("tradeQty")?.value || prompt(`Sell how many shares of ${symbol}?`));
     if (!symbol || !qty || qty <= 0) return;
     sellStock(symbol, qty);
   });
@@ -1029,94 +1182,3 @@ if (loginForm) {
     console.warn("Unable to auto-fetch user at load:", err);
   }
 })();
-
-/* ------------------ Chart helpers (unchanged) ------------------ */
-function generateStockData(count) {
-  const data = [];
-  let lastClose = 50 + Math.random() * 150;
-  let time = new Date();
-  time.setDate(time.getDate() - count);
-
-  for (let i = 0; i < count; i++) {
-    time.setDate(time.getDate() + 1);
-    const open = lastClose + (Math.random() - 0.5) * 5;
-    const high = Math.max(open, lastClose) + Math.random() * 5;
-    const low = Math.min(open, lastClose) - Math.random() * 5;
-    const close = low + Math.random() * (high - low);
-    lastClose = close;
-
-    data.push({
-      time: time.toISOString().split("T")[0],
-      open: parseFloat(open.toFixed(2)),
-      high: parseFloat(high.toFixed(2)),
-      low: parseFloat(low.toFixed(2)),
-      close: parseFloat(close.toFixed(2)),
-    });
-  }
-  return data;
-}
-
-function renderChart(data, theme, symbol) {
-  const chartContainer = document.getElementById("chart-container");
-  const chartLoader = document.getElementById("chart-loader");
-
-  if (!chartContainer) return;
-
-  if (chartInstance) {
-    chartInstance.remove();
-  }
-
-  chartInstance = LightweightCharts.createChart(chartContainer, {
-    width: chartContainer.clientWidth,
-    height: chartContainer.clientHeight,
-    layout: {
-      backgroundColor: theme === "dark" ? "#1f2937" : "#ffffff",
-      textColor: theme === "dark" ? "#d1d5db" : "#111827",
-    },
-    grid: {
-      vertLines: { color: theme === "dark" ? "#374151" : "#e5e7eb" },
-      horzLines: { color: theme === "dark" ? "#374151" : "#e5e7eb" },
-    },
-    crosshair: {
-      mode: LightweightCharts.CrosshairMode.Normal,
-    },
-    priceScale: {
-      borderColor: theme === "dark" ? "#4b5563" : "#cccccc",
-    },
-    timeScale: {
-      borderColor: theme === "dark" ? "#4b5563" : "#cccccc",
-      timeVisible: true,
-      secondsVisible: false,
-    },
-    watermark: {
-      color: theme === "dark" ? "rgba(209, 213, 219, 0.1)" : "rgba(0, 0, 0, 0.1)",
-      visible: true,
-      text: symbol,
-      fontSize: 48,
-      horzAlign: "center",
-      vertAlign: "center",
-    },
-  });
-
-  const candleSeries = chartInstance.addCandlestickSeries({
-    upColor: theme === "dark" ? "#10b981" : "#22c55e",
-    downColor: theme === "dark" ? "#ef4444" : "#dc2626",
-    borderDownColor: theme === "dark" ? "#ef4444" : "#dc2626",
-    borderUpColor: theme === "dark" ? "#10b981" : "#22c55e",
-    wickDownColor: theme === "dark" ? "#ef4444" : "#dc2626",
-    wickUpColor: theme === "dark" ? "#10b981" : "#22c55e",
-  });
-
-  candleSeries.setData(data);
-  chartInstance.timeScale().fitContent();
-  if (chartLoader) chartLoader.classList.add("hidden");
-
-  window.addEventListener("resize", () => {
-    if (chartInstance && chartContainer.clientWidth > 0 && chartContainer.clientHeight > 0) {
-      chartInstance.resize(chartContainer.clientWidth, chartContainer.clientHeight);
-    }
-  });
-}
-
-/* ------------------ initial chart ------------------ */
-renderChart(generateStockData(100), localStorage.getItem("color-theme") || "light", "TTCO");
