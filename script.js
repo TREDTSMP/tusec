@@ -104,29 +104,6 @@ supabase.auth.onAuthStateChange((_event, session) => {
   currentUser = session?.user || null;
   updateAuthUI();
 });
-
-function updateAuthUI() {
-  const loginBtns = [loginBtnNav, loginBtnMobile];
-  const logoutBtn = document.getElementById("logoutBtn");
-  const tradeControls = document.getElementById("trade-controls");
-
-  if (currentUser) {
-    // Logged in
-    loginBtns.forEach(btn => btn && btn.classList.add("hidden"));
-    if (logoutBtn) logoutBtn.classList.remove("hidden");
-    if (tradeControls) tradeControls.classList.remove("hidden");
-
-    loadBalance();
-    loadPortfolio();
-  } else {
-    // Logged out
-    loginBtns.forEach(btn => btn && btn.classList.remove("hidden"));
-    if (logoutBtn) logoutBtn.classList.add("hidden");
-    if (tradeControls) tradeControls.classList.add("hidden");
-
-    if (tcBalanceEl) tcBalanceEl.style.display = "none";
-  }
-}
 /* ------------------ Theme & UI ------------------ */
 const themeToggleBtn = document.getElementById("theme-toggle");
 const themeToggleDarkIcon = document.getElementById("theme-toggle-dark-icon");
@@ -181,7 +158,30 @@ if (mobileMenuButton && mobileMenu) {
       .forEach((icon) => icon.classList.toggle("hidden"));
   });
 }
+/* ================== LOG IN-OUT FN ================== */
+function updateAuthUI() {
+  const loginBtns = [loginBtnNav, loginBtnMobile];
+  const logoutBtn = document.getElementById("logoutBtn");
+  const tradeControls = document.getElementById("trade-controls");
 
+  if (currentUser) {
+    // Logged in
+    loginBtns.forEach(btn => btn && btn.classList.add("hidden"));
+    if (logoutBtn) logoutBtn.classList.remove("hidden");
+    if (tradeControls) tradeControls.classList.remove("hidden");
+
+    loadBalance();
+    loadPortfolio();
+  } else {
+    // Logged out
+    loginBtns.forEach(btn => btn && btn.classList.remove("hidden"));
+    if (logoutBtn) logoutBtn.classList.add("hidden");
+    if (tradeControls) tradeControls.classList.add("hidden");
+
+    if (tcBalanceEl) tcBalanceEl.style.display = "none";
+  }
+}
+/* ================== LOG IN - OUT FN ================== */
 /* ------------------ Modals ------------------ */
 const loginModal = document.getElementById("loginModal");
 const registerModal = document.getElementById("registerModal");
@@ -1204,4 +1204,5 @@ if (loginForm) {
     console.warn("Unable to auto-fetch user at load:", err);
   }
 })();
+
 
