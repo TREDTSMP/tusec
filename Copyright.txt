@@ -1,10 +1,10 @@
-Copyright © 2025 TREDT Publications Society (Regd.)
+Copyright © 2026 TREDT Publications Society (Regd.)
 
 All rights reserved.
 
-This software and associated documentation files (the "Software") are the exclusive property of TREDT Publications Society (Regd.). Unauthorized copying, modification, distribution, or use of this Software, in whole or in part, without prior written permission from TREDT Publications Society (Regd.), is strictly prohibited.
+This webpage application and associated documentation files (the "Application") are the exclusive property of TREDT Publications Society (Regd.). Unauthorized copying, modification, distribution, or use of this Software, in whole or in part, without prior written permission from TREDT Publications Society (Regd.), is strictly prohibited.
 
-The Software is provided "as is," without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and noninfringement. In no event shall TREDT Publications Society (Regd.) or its affiliates be liable for any claim, damages, or other liability, arising from the use or inability to use the Software.
+The Application is provided "as is," without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and noninfringement. In no event shall TREDT Publications Society (Regd.) or its affiliates be liable for any claim, damages, or other liability, arising from the use or inability to use the Software.
 
 This copyright notice is governed by the laws of India and falls under the jurisdiction of the Delhi High Court.
 
@@ -20,4 +20,5 @@ TREDT Publications Society (Regd.) reserves the right to modify or update this n
 
 ©TREDT PUBLICATIONS SOCIETY(REGD.) 2026 - 2027
 All rights reserved.
+
 
