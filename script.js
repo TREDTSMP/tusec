@@ -289,17 +289,6 @@ function isMarketOpen() {
 
 /* ------------------ Stock data ------------------ */
 const initialStockPrices = {
-  RTCO: {
-    name: "Royal Trading Company",
-    price: 10671.06,
-    change: "+0.00",
-    changePercent: "+0.00%",
-    open: 10671.06,
-    high: 10671.06,
-    low: 10671.06,
-    dayHigh: 10671.06,
-    dayLow: 10671.06,
-  },
   UTCO: {
     name: "Union Technologies Inc.",
     price: 5471.23,
@@ -1240,5 +1229,6 @@ updateAuthUI();
     console.warn("Unable to auto-fetch user at load:", err);
   }
 })();
+
 
 
