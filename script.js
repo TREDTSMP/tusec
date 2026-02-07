@@ -311,6 +311,17 @@ const initialStockPrices = {
     dayHigh: 4180.09,
     dayLow: 4180.09,
   },
+  VTL: {
+    name: "Vision Technologies Ltd.",
+    price: 100.06,
+    change: "+0.00",
+    changePercent: "+0.00%",
+    open: 100.06,
+    high: 100.06,
+    low: 100.06,
+    dayHigh: 100.06,
+    dayLow: 100.06,
+  },
   IBT: {
     name: "Imperial Bank of TREDT",
     price: 4808.64,
@@ -1229,6 +1240,7 @@ updateAuthUI();
     console.warn("Unable to auto-fetch user at load:", err);
   }
 })();
+
 
 
 
