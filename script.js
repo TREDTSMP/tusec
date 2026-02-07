@@ -311,6 +311,17 @@ const initialStockPrices = {
     dayHigh: 4180.09,
     dayLow: 4180.09,
   },
+RTCO: {
+    name: "Royal Trading Company",
+    price: 10671.06,
+    change: "+0.00",
+    changePercent: "+0.00%",
+    open: 10671.06,
+    high: 10671.06,
+    low: 10671.06,
+    dayHigh: 10671.06,
+    dayLow: 10671.06,
+  },
   VTL: {
     name: "Vision Technologies Ltd.",
     price: 100.06,
@@ -1240,6 +1251,7 @@ updateAuthUI();
     console.warn("Unable to auto-fetch user at load:", err);
   }
 })();
+
 
 
 
