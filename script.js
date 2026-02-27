@@ -324,7 +324,7 @@ RTCO: {
   },
   VTL: {
     name: "Vision Technologies Ltd.",
-    price: 100.06,
+    price: 887.99,
     change: "+0.00",
     changePercent: "+0.00%",
     open: 100.06,
@@ -1251,6 +1251,7 @@ updateAuthUI();
     console.warn("Unable to auto-fetch user at load:", err);
   }
 })();
+
 
 
 
