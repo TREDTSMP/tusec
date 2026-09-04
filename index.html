@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="hosting-provider" content="Netlify">
+  <meta name="netlify-deploy" content="https://netlify.new/?utm_campaign=ai-legible&amp;utm_source=meta&amp;utm_medium=referral&amp;utm_id=63bdefba-b588-45e2-8413-192e893e90c2">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TUSEC WEB APP — Shutdown</title>
   <style>
@@ -14,11 +16,27 @@
       justify-content: center;
       padding: 24px;
       background: #000;
-      color: #fff;
+      color: #3ecf8e;
       font-family: Arial, Helvetica, sans-serif;
       text-align: center;
+      overflow: hidden;
     }
+
+    /* ASCII & Stock Canvas Overlay */
+    #ascii-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+      opacity: 0.45;
+      pointer-events: none;
+    }
+
     .shutdown {
+      position: relative;
+      z-index: 10;
       width: min(760px, 100%);
       padding: 48px 28px;
     }
@@ -28,16 +46,19 @@
       line-height: 1.08;
       font-weight: 800;
       letter-spacing: -0.03em;
+      color: #3ecf8e;
+      text-shadow: 0 0 16px rgba(62, 207, 142, 0.35);
     }
     p {
       margin: 12px 0;
       font-size: clamp(1rem, 2.2vw, 1.25rem);
       line-height: 1.6;
+      color: #3ecf8e;
     }
     .copyright {
       margin-top: 8px;
       font-size: .95rem;
-      color: #aaa;
+      color: #248a5c;
     }
     .info {
       margin-top: 40px;
@@ -46,9 +67,9 @@
       display: inline-block;
       margin-top: 14px;
       padding: 13px 24px;
-      border: 1px solid #fff;
+      border: 1px solid #3ecf8e;
       border-radius: 6px;
-      background: #fff;
+      background: #3ecf8e;
       color: #000;
       text-decoration: none;
       font-weight: 700;
@@ -56,15 +77,19 @@
     }
     .button:hover {
       background: #000;
-      color: #fff;
+      color: #3ecf8e;
+      box-shadow: 0 0 20px rgba(62, 207, 142, 0.5);
     }
     .button:focus-visible {
-      outline: 2px solid #fff;
+      outline: 2px solid #3ecf8e;
       outline-offset: 4px;
     }
   </style>
 </head>
 <body>
+
+  <canvas id="ascii-canvas"></canvas>
+
   <main class="shutdown">
     <h1>TUSEC WEB APP HAS BEEN SHUTDOWN!</h1>
     <p>THANKS FOR WORKING WITH US. 2024 - 2026.</p>
@@ -76,5 +101,162 @@
       </a>
     </div>
   </main>
+
+  <script>
+    const canvas = document.getElementById('ascii-canvas');
+    const ctx = canvas.getContext('2d');
+
+    let width, height;
+    const fontSize = 14;
+    const fontWidth = 8.5;
+    let cols = 0, rows = 0;
+    let frame = 0;
+
+    // Candlesticks setup
+    const candleCount = 32;
+    let candles = [];
+
+    function initCandles() {
+      candles = [];
+      let price = 120;
+      for (let i = 0; i < candleCount; i++) {
+        let open = price;
+        let close = open + (Math.random() * 24 - 12);
+        let high = Math.max(open, close) + Math.random() * 8;
+        let low = Math.min(open, close) - Math.random() * 8;
+        candles.push({
+          open, high, low, close,
+          targetClose: close,
+          targetHigh: high,
+          targetLow: low,
+          blink: Math.random() > 0.5
+        });
+        price = close;
+      }
+    }
+
+    function resizeCanvas() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+      cols = Math.floor(width / fontWidth);
+      rows = Math.floor(height / fontSize);
+      initCandles();
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // Random stock fluctuations every 100ms
+    setInterval(() => {
+      for (let i = 0; i < candles.length; i++) {
+        let c = candles[i];
+        let delta = (Math.random() - 0.5) * 16;
+        c.targetClose = Math.max(20, c.close + delta);
+        c.targetHigh = Math.max(c.open, c.targetClose) + Math.random() * 8;
+        c.targetLow = Math.min(c.open, c.targetClose) - Math.random() * 8;
+        c.blink = Math.random() > 0.35;
+      }
+    }, 100);
+
+    const charSets = {
+      waves: ['~', '-', '=', '≈', '~'],
+      brackets: ['{', '[', '<', '(', '{', '}', ']', '>', ')', '}'],
+      hex: ['0', '1', 'A', 'B', '0', '1', 'I', 'Q', '+', '0'],
+      arrows: ['→', '↑', '↓', '←', '↗', '↘']
+    };
+
+    function drawCandlesticks() {
+      const candleWidth = width / candleCount;
+      const padding = candleWidth * 0.35;
+      const bodyWidth = Math.max( candleWidth - padding, 4);
+
+      candles.forEach((c, i) => {
+        // Smooth interpolation for fluid movement
+        c.close += (c.targetClose - c.close) * 0.22;
+        c.high += (c.targetHigh - c.high) * 0.22;
+        c.low += (c.targetLow - c.low) * 0.22;
+
+        const isUp = c.close >= c.open;
+        let color = isUp ? '#3ecf8e' : '#ef4444';
+
+        // Blinking highlight state
+        if (c.blink) {
+          color = isUp ? '#80f2be' : '#ff6b6b';
+        }
+
+        const x = i * candleWidth + padding / 2;
+        const baseY = height * 0.85;
+        const scale = height * 0.003;
+
+        const yOpen = baseY - c.open * scale;
+        const yClose = baseY - c.close * scale;
+        const yHigh = baseY - c.high * scale;
+        const yLow = baseY - c.low * scale;
+
+        // Draw Wick
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(x + bodyWidth / 2, yHigh);
+        ctx.lineTo(x + bodyWidth / 2, yLow);
+        ctx.stroke();
+
+        // Draw Candle Body
+        ctx.fillStyle = color;
+        const topY = Math.min(yOpen, yClose);
+        const h = Math.max(Math.abs(yClose - yOpen), 3);
+        ctx.fillRect(x, topY, bodyWidth, h);
+      });
+    }
+
+    function render() {
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, width, height);
+
+      // Draw Terminal ASCII Background
+      ctx.font = `${fontSize}px 'Courier New', monospace`;
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          let char = ' ';
+          let color = '#1c6b48';
+
+          if (r < 3 || r > rows - 4) {
+            const index = Math.floor(Math.abs(Math.sin((c + frame * 0.1) * 0.2)) * charSets.brackets.length);
+            char = charSets.brackets[index];
+            color = (c + r) % 5 === 0 ? '#3ecf8e' : '#144d34';
+          } else if (r % 7 === 0) {
+            const wave = Math.sin(c * 0.15 + frame * 0.08) * 2;
+            if (Math.abs(wave) > 0.8) {
+              const index = Math.floor((wave + 2) % charSets.waves.length);
+              char = charSets.waves[index];
+              color = '#278259';
+            }
+          } else if (c % 18 < 6 && r % 5 === 0) {
+            const hexIndex = (c + r + frame) % charSets.hex.length;
+            char = charSets.hex[hexIndex];
+            color = '#3ecf8e';
+          } else if (c % 22 > 16) {
+            const arrowIndex = Math.floor((r + frame * 0.2) % charSets.arrows.length);
+            char = charSets.arrows[arrowIndex];
+            color = '#1c3d2f';
+          }
+
+          if (char !== ' ') {
+            ctx.fillStyle = color;
+            ctx.fillText(char, c * fontWidth, r * fontSize);
+          }
+        }
+      }
+
+      // Draw Moving Stock Candlesticks
+      drawCandlesticks();
+
+      frame++;
+      requestAnimationFrame(render);
+    }
+
+    render();
+  </script>
 </body>
 </html>
